@@ -9,11 +9,12 @@
 
 #include "PhysicalDevice.hpp"
 #include "Queue.hpp"
+#include "Window.hpp"
 
 namespace pure {
     class App {
     public:
-        App();
+        App(const Window &window);
         ~App();
 
     private:
@@ -25,8 +26,12 @@ namespace pure {
         // Создание логического устройства
         void createDevice();
 
+        // Создаение поверхности
+        void createSurface(const Window &window);
+
         vk::Instance instance{};
         pure::PhysicalDevice physicalDevice{};
         vk::Device device{};
+        vk::SurfaceKHR surface{};
     };
 }

@@ -1,13 +1,15 @@
 #include "App.hpp"
 
-pure::App::App() {
+pure::App::App(const Window &window) {
     createInstance();
+    createSurface(window);
     physicalDevice = pure::PhysicalDevice::selectPhysicalDevice(instance);
     createDevice();
 }
 
 pure::App::~App() {
     device.destroy();
+    instance.destroySurfaceKHR(surface);
     instance.destroy();
 }
 
@@ -80,4 +82,18 @@ void pure::App::createDevice() {
     } catch (const std::exception &ex) {
         std::cerr << "Failed to create Device: " << ex.what() << std::endl;
     }
+}
+
+void pure::App::createSurface(const Window &window) {
+    VkSurfaceKHR rawSurface;
+
+    GLFWwindow *glfwWindow = window.get();
+
+    // Используем GLFW для создания VkSurfaceKHR
+    if (glfwCreateWindowSurface(static_cast<VkInstance>(instance), glfwWindow, nullptr, &rawSurface) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create window surface!");
+    }
+
+    // Оборачиваем VkSurfaceKHR в vk::SurfaceKHR
+    surface = vk::SurfaceKHR(rawSurface);
 }
