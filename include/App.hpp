@@ -6,6 +6,7 @@
 #include <glfw/glfw3.h>
 
 #include "PhysicalDevice.hpp"
+#include "Queue.hpp"
 
 namespace pure {
     class App {
