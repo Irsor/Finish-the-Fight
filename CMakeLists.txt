@@ -30,6 +30,7 @@ FetchContent_MakeAvailable(glfw)
 
 add_executable(${PROJECT_NAME} main.cpp
     src/App.cpp
+    src/PhysicalDevice.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

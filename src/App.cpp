@@ -2,9 +2,12 @@
 
 pure::App::App() {
     createInstance();
+    physicalDevice = pure::PhysicalDevice::selectPhysicalDevice(instance);
+    createDevice();
 }
 
 pure::App::~App() {
+    device.destroy();
     instance.destroy();
 }
 
@@ -57,4 +60,24 @@ const std::vector<const char*> pure::App::getExtensions() const {
 #endif
 
     return extensions;
+}
+
+void pure::App::createDevice() {
+    uint32_t queueIndex = physicalDevice.selectGraphicsQueueIndex();
+    float queuePriority = 1.0f;
+
+    vk::DeviceQueueCreateInfo queueCreateInfo{};
+    queueCreateInfo.setQueueFamilyIndex(queueIndex);
+    queueCreateInfo.setQueueCount(1);
+    queueCreateInfo.setPQueuePriorities(&queuePriority);
+
+    vk::DeviceCreateInfo deviceCreateInfo{};
+    deviceCreateInfo.setQueueCreateInfoCount(1);
+    deviceCreateInfo.setPQueueCreateInfos(&queueCreateInfo);
+
+    try {
+        device = physicalDevice.getDevice().createDevice(deviceCreateInfo);
+    } catch (const std::exception &ex) {
+        std::cerr << "Failed to create Device: " << ex.what() << std::endl;
+    }
 }
