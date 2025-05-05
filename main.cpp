@@ -1,6 +1,8 @@
 #include <iostream>
 
+#include "App.hpp"
+
 int main() {
-    std::cout << "Hello, World!" << std::endl;
+    pure::App app{};
     return 0;
 }

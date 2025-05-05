@@ -1,6 +1,33 @@
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION 3.30)
 project(Pure)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(${PROJECT_NAME} main.cpp)
+include(FetchContent)
+
+# Vulkan SDK
+find_package(Vulkan REQUIRED)
+
+# Vulkan‑Hpp
+FetchContent_Declare(
+        vulkan-hpp
+        GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Hpp.git
+        GIT_TAG        v1.4.312
+)
+
+FetchContent_MakeAvailable(vulkan-hpp)
+
+add_executable(${PROJECT_NAME} main.cpp
+    src/App.cpp
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${vulkan-hpp_SOURCE_DIR}/include
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+        Vulkan::Vulkan
+)
