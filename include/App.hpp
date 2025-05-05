@@ -11,7 +11,7 @@
 #include "Queue.hpp"
 #include "Window.hpp"
 
-namespace pure {
+namespace ff {
     class App {
     public:
         App(const Window &window);
@@ -30,7 +30,7 @@ namespace pure {
         void createSurface(const Window &window);
 
         vk::Instance instance{};
-        pure::PhysicalDevice physicalDevice{};
+        ff::PhysicalDevice physicalDevice{};
         vk::Device device{};
         vk::SurfaceKHR surface{};
     };

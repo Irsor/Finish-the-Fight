@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan.hpp>
 
-namespace pure {
+namespace ff {
     class PhysicalDevice {
     public:
         PhysicalDevice();

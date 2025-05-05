@@ -1,30 +1,30 @@
 #include "Window.hpp"
 
-pure::Window::Window(const std::string &windowName, float windowWidth, float windowHeight) : name(windowName), width(windowWidth), height(windowHeight) {
+ff::Window::Window(const std::string &windowName, float windowWidth, float windowHeight) : name(windowName), width(windowWidth), height(windowHeight) {
     initWindow();
 }
 
-pure::Window::~Window() {
+ff::Window::~Window() {
     glfwTerminate();
 }
 
-GLFWwindow *pure::Window::get() const {
+GLFWwindow *ff::Window::get() const {
     return window;
 }
 
-float pure::Window::getHeight() const {
+float ff::Window::getHeight() const {
     return height;
 }
 
-float pure::Window::getWidth() const {
+float ff::Window::getWidth() const {
     return width;
 }
 
-std::string pure::Window::getName() const {
+std::string ff::Window::getName() const {
     return name;
 }
 
-void pure::Window::initWindow() {
+void ff::Window::initWindow() {
     if (!glfwInit()) {
         std::cerr << "GLFW init error" << std::endl;
     }

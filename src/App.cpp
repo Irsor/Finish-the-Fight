@@ -1,19 +1,19 @@
 #include "App.hpp"
 
-pure::App::App(const Window &window) {
+ff::App::App(const Window &window) {
     createInstance();
     createSurface(window);
-    physicalDevice = pure::PhysicalDevice::selectPhysicalDevice(instance);
+    physicalDevice = ff::PhysicalDevice::selectPhysicalDevice(instance);
     createDevice();
 }
 
-pure::App::~App() {
+ff::App::~App() {
     device.destroy();
     instance.destroySurfaceKHR(surface);
     instance.destroy();
 }
 
-void pure::App::createInstance() {
+void ff::App::createInstance() {
     try {
         // Информация о приложении
         vk::ApplicationInfo appInfo{};
@@ -50,7 +50,7 @@ void pure::App::createInstance() {
     }
 }
 
-const std::vector<const char*> pure::App::getExtensions() const {
+const std::vector<const char*> ff::App::getExtensions() const {
     uint32_t glfwExtensionCount = 0;
     const char **glfwExtensions;
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -64,7 +64,7 @@ const std::vector<const char*> pure::App::getExtensions() const {
     return extensions;
 }
 
-void pure::App::createDevice() {
+void ff::App::createDevice() {
     uint32_t queueIndex = physicalDevice.selectGraphicsQueueIndex();
     float queuePriority = 1.0f;
 
@@ -84,7 +84,7 @@ void pure::App::createDevice() {
     }
 }
 
-void pure::App::createSurface(const Window &window) {
+void ff::App::createSurface(const Window &window) {
     VkSurfaceKHR rawSurface;
 
     GLFWwindow *glfwWindow = window.get();

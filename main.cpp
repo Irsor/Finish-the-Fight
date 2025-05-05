@@ -6,8 +6,8 @@
 #include "Window.hpp"
 
 int main() {
-    pure::Window window{};
-    pure::App app{window};
+    ff::Window window{"Finish the Fight"};
+    ff::App app{window};
 
     while (!glfwWindowShouldClose(window.get())) {
         glfwPollEvents();

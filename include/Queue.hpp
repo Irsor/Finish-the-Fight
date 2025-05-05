@@ -4,7 +4,7 @@
 
 #include <vulkan/vulkan.hpp>
 
-namespace pure {
+namespace ff {
     class Queue {
     public:
         Queue(const vk::Device &device, uint32_t familyIndex);

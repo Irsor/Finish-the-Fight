@@ -1,6 +1,6 @@
 #include "Queue.hpp"
 
-pure::Queue::Queue(const vk::Device &device, uint32_t familyIndex) {
+ff::Queue::Queue(const vk::Device &device, uint32_t familyIndex) {
     vk::DeviceQueueInfo2 queueInfo{};
     queueInfo.setQueueFamilyIndex(familyIndex);
     queueInfo.setQueueIndex(0);
@@ -12,9 +12,9 @@ pure::Queue::Queue(const vk::Device &device, uint32_t familyIndex) {
     }
 }
 
-pure::Queue::~Queue() {
+ff::Queue::~Queue() {
 }
 
-vk::Queue pure::Queue::getQueue() const {
+vk::Queue ff::Queue::getQueue() const {
     return queue;
 }

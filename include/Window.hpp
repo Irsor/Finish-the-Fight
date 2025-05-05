@@ -4,7 +4,7 @@
 
 #include <glfw/glfw3.h>
 
-namespace pure {
+namespace ff {
     class Window {
     public:
         Window(const std::string &windowName = "Xenia", float windowWidth = 800, float windowHeight = 600);

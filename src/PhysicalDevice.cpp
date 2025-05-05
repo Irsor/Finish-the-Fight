@@ -1,12 +1,12 @@
 #include "PhysicalDevice.hpp"
 
-pure::PhysicalDevice::PhysicalDevice() {
+ff::PhysicalDevice::PhysicalDevice() {
 }
 
-pure::PhysicalDevice::~PhysicalDevice() {
+ff::PhysicalDevice::~PhysicalDevice() {
 }
 
-void pure::PhysicalDevice::displayQueueFamily() const {
+void ff::PhysicalDevice::displayQueueFamily() const {
     // Получаем список семейств очередей устройства
     std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
 
@@ -20,7 +20,7 @@ void pure::PhysicalDevice::displayQueueFamily() const {
     }
 }
 
-uint32_t pure::PhysicalDevice::selectGraphicsQueueIndex() const {
+uint32_t ff::PhysicalDevice::selectGraphicsQueueIndex() const {
     std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
 
     for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilies.size()); ++i) {
@@ -32,12 +32,12 @@ uint32_t pure::PhysicalDevice::selectGraphicsQueueIndex() const {
     throw std::runtime_error("No suitable graphics queue family found.");
 }
 
-vk::PhysicalDevice pure::PhysicalDevice::getDevice() const {
+vk::PhysicalDevice ff::PhysicalDevice::getDevice() const {
     return device;
 }
 
 
-pure::PhysicalDevice pure::PhysicalDevice::selectPhysicalDevice(const vk::Instance &instance) {
+ff::PhysicalDevice ff::PhysicalDevice::selectPhysicalDevice(const vk::Instance &instance) {
     std::vector<const char *> rayTracingExtensions = {
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
@@ -90,7 +90,7 @@ pure::PhysicalDevice pure::PhysicalDevice::selectPhysicalDevice(const vk::Instan
             }
 
             // Найдено подходящее устройство
-            pure::PhysicalDevice selected;
+            ff::PhysicalDevice selected;
             selected.device = device;
             selected.deviceProperties = props;
             selected.deviceFeatures = features;
