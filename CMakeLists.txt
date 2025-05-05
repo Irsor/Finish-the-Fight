@@ -19,6 +19,15 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(vulkan-hpp)
 
+# glfw
+FetchContent_Declare(
+        glfw
+        GIT_REPOSITORY https://github.com/glfw/glfw.git
+        GIT_TAG        3.4
+)
+
+FetchContent_MakeAvailable(glfw)
+
 add_executable(${PROJECT_NAME} main.cpp
     src/App.cpp
 )
@@ -30,4 +39,5 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         Vulkan::Vulkan
+        glfw
 )

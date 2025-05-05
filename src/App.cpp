@@ -16,10 +16,15 @@ void pure::App::createInstance() {
         appInfo.setApplicationVersion(1.0);
         appInfo.setPEngineName("No Engine");
         appInfo.setEngineVersion(1.0);
-        appInfo.setApiVersion(vk::ApiVersion14);
+        appInfo.setApiVersion(vk::ApiVersion14);       
 
         vk::InstanceCreateInfo instanceCreateInfo{};
         instanceCreateInfo.setPApplicationInfo(&appInfo);
+
+        // Устанавливаем расширения
+        auto extensions = getExtensions();
+        instanceCreateInfo.setEnabledExtensionCount(extensions.size());
+        instanceCreateInfo.setPpEnabledExtensionNames(extensions.data());
 
         const std::vector<const char *> validationLayers = {
             "VK_LAYER_KHRONOS_validation"
@@ -38,4 +43,18 @@ void pure::App::createInstance() {
     } catch (const std::exception &ex) {
         std::cerr << "Ошибка создания Vulkan Instance: " << ex.what() << std::endl;
     }
+}
+
+const std::vector<const char*> pure::App::getExtensions() const {
+    uint32_t glfwExtensionCount = 0;
+    const char **glfwExtensions;
+    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+    std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+#ifndef NDEBUG
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
+
+    return extensions;
 }
