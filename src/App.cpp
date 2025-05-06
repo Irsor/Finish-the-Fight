@@ -6,10 +6,12 @@ ff::App::App(const Window &window) {
     physicalDevice = ff::PhysicalDevice::selectPhysicalDevice(instance);
     createDevice();
     swapchain.init(instance, physicalDevice, device, surface, window);
+    createImageViews();
 }
 
 ff::App::~App() {
     swapchain.destroy(device);
+    destroyImageViews();
     device.destroy();
     instance.destroySurfaceKHR(surface);
     instance.destroy();
@@ -120,4 +122,45 @@ void ff::App::createSurface(const Window &window) {
 
     // ќборачиваем VkSurfaceKHR в vk::SurfaceKHR
     surface = vk::SurfaceKHR(rawSurface);
+}
+
+void ff::App::createImageViews() {
+    // ѕолучение изображений
+    auto swapchainImages = device.getSwapchainImagesKHR(swapchain.get());
+
+    for (const auto &swapchainImage: swapchainImages) {
+        vk::ImageViewCreateInfo imageViewCreateInfo{};
+        imageViewCreateInfo.setImage(swapchainImage);
+        imageViewCreateInfo.setViewType(vk::ImageViewType::e2D);// изображение рассматриваетс€ как 2D-текстура
+        imageViewCreateInfo.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format);
+
+        vk::ComponentMapping components{};
+        components.setR(vk::ComponentSwizzle::eIdentity);
+        components.setG(vk::ComponentSwizzle::eIdentity);
+        components.setB(vk::ComponentSwizzle::eIdentity);
+        components.setA(vk::ComponentSwizzle::eIdentity);
+        imageViewCreateInfo.setComponents(components);
+
+        vk::ImageSubresourceRange subresourceRange{};
+        subresourceRange.setAspectMask(vk::ImageAspectFlagBits::eColor);
+        subresourceRange.setBaseMipLevel(0);
+        subresourceRange.setLevelCount(1);
+        subresourceRange.setBaseArrayLayer(0);
+        subresourceRange.setLayerCount(1);
+        imageViewCreateInfo.setSubresourceRange(subresourceRange);
+
+        // —оздание представлени€ изображени€
+        try {
+            imageViews.push_back(device.createImageView(imageViewCreateInfo));
+        } catch (const std::exception &ex) {
+            std::cerr << "Failed to create image views: " << ex.what() << std::endl;
+        }
+    }
+}
+
+
+void ff::App::destroyImageViews() const {
+    for (const auto& imageView : imageViews) {
+        device.destroyImageView(imageView);
+    }
 }

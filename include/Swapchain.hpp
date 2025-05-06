@@ -15,11 +15,16 @@ namespace ff {
         void init(const vk::Instance &instance, const ff::PhysicalDevice &physicalDevice, const vk::Device &device, const vk::SurfaceKHR &surface, const Window &window);
         void destroy(const vk::Device &device) const;
 
+        vk::SwapchainKHR get() const;
+        vk::SurfaceFormat2KHR getSurfaceFormat() const;
+
     private:
         vk::SurfaceFormat2KHR chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormat2KHR> &availableFormats);
         vk::PresentModeKHR chooseSwapchainPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
         vk::Extent2D chooseSwapchainExtent(const vk::SurfaceCapabilities2KHR &capabilities, const Window &window);
 
         vk::SwapchainKHR swapchain{};
+
+        vk::SurfaceFormat2KHR surfaceFormat{};
     };
 }

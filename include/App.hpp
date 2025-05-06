@@ -30,10 +30,15 @@ namespace ff {
         // Создание поверхности
         void createSurface(const Window &window);
 
+        // Создание представлений изображений и удаление
+        void createImageViews();
+        void destroyImageViews() const;
+
         vk::Instance instance{};
         ff::PhysicalDevice physicalDevice{};
         vk::Device device{};
         vk::SurfaceKHR surface{};
         ff::Swapchain swapchain{};
+        std::vector<vk::ImageView> imageViews{};
     };
 }

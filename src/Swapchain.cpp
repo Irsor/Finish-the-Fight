@@ -17,7 +17,7 @@ void ff::Swapchain::init(const vk::Instance &instance, const ff::PhysicalDevice 
     auto swapchainSupport = physicalDevice.querySwapchainSupport(surface);
 
     // Выбор формата изображения
-    auto surfaceFormat = chooseSwapchainSurfaceFormat(swapchainSupport.formats);
+    surfaceFormat = chooseSwapchainSurfaceFormat(swapchainSupport.formats);
 
     // Выбор режима представления
     auto presentMode = chooseSwapchainPresentMode(swapchainSupport.presentModes);
@@ -75,6 +75,14 @@ void ff::Swapchain::init(const vk::Instance &instance, const ff::PhysicalDevice 
 
 void ff::Swapchain::destroy(const vk::Device &device) const {
     device.destroySwapchainKHR(swapchain);
+}
+
+vk::SwapchainKHR ff::Swapchain::get() const {
+    return swapchain;
+}
+
+vk::SurfaceFormat2KHR ff::Swapchain::getSurfaceFormat() const {
+    return surfaceFormat;
 }
 
 vk::SurfaceFormat2KHR ff::Swapchain::chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormat2KHR> &availableFormats) {
