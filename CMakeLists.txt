@@ -33,7 +33,10 @@ add_executable(${PROJECT_NAME} main.cpp
     src/PhysicalDevice.cpp
     src/Queue.cpp
     src/Window.cpp
- "src/Swapchain.cpp")
+    src/Swapchain.cpp
+    src/Pipeline.cpp
+    src/Utils/FileUtils.cpp
+)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

@@ -7,6 +7,7 @@ ff::App::App(const Window &window) {
     createDevice();
     swapchain.init(instance, physicalDevice, device, surface, window);
     createImageViews();
+    pipeline.readShaders("D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
 }
 
 ff::App::~App() {

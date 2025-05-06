@@ -11,6 +11,7 @@
 #include "Queue.hpp"
 #include "Window.hpp"
 #include "Swapchain.hpp"
+#include "Pipeline.hpp"
 
 namespace ff {
     class App {
@@ -40,5 +41,6 @@ namespace ff {
         vk::SurfaceKHR surface{};
         ff::Swapchain swapchain{};
         std::vector<vk::ImageView> imageViews{};
+        ff::Pipeline pipeline{};
     };
 }
