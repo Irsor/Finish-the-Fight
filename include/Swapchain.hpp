@@ -8,8 +8,12 @@
 namespace ff {
     class Swapchain {
     public:
-        Swapchain(const vk::Instance &instance, const ff::PhysicalDevice &device, const vk::SurfaceKHR &surface, const Window &window);
+        Swapchain();
+        Swapchain(const vk::Instance &instance, const ff::PhysicalDevice &physicalDevice, const vk::Device &device, const vk::SurfaceKHR &surface, const Window &window);
         ~Swapchain();
+
+        void init(const vk::Instance &instance, const ff::PhysicalDevice &physicalDevice, const vk::Device &device, const vk::SurfaceKHR &surface, const Window &window);
+        void destroy(const vk::Device &device) const;
 
     private:
         vk::SurfaceFormat2KHR chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormat2KHR> &availableFormats);

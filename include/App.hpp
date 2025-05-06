@@ -10,6 +10,7 @@
 #include "PhysicalDevice.hpp"
 #include "Queue.hpp"
 #include "Window.hpp"
+#include "Swapchain.hpp"
 
 namespace ff {
     class App {
@@ -29,13 +30,10 @@ namespace ff {
         // Создание поверхности
         void createSurface(const Window &window);
 
-        // Создание цепочки буферов
-        void createSwapchain(const vk::SurfaceKHR &surface);
-
         vk::Instance instance{};
         ff::PhysicalDevice physicalDevice{};
         vk::Device device{};
         vk::SurfaceKHR surface{};
-        vk::SwapchainKHR swapchain{};
+        ff::Swapchain swapchain{};
     };
 }

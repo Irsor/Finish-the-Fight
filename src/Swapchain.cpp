@@ -1,19 +1,80 @@
 #include "Swapchain.hpp"
 
-ff::Swapchain::Swapchain(const vk::Instance &instance, const ff::PhysicalDevice &device, const vk::SurfaceKHR &surface, const Window &window) {
-    auto surfaceData = device.querySwapchainSupport(surface);
+ff::Swapchain::Swapchain() {
+}
 
-    // Выбор формата изображения
-    auto surfaceFormat = chooseSwapchainSurfaceFormat(surfaceData.formats);
-
-    // Выбор режима представления
-    auto presentMode = chooseSwapchainPresentMode(surfaceData.presentModes);
-
-    // Выбор размеров изображения
-    auto extent = chooseSwapchainExtent(surfaceData.capabilities, window);
+ff::Swapchain::Swapchain(const vk::Instance &instance, const ff::PhysicalDevice &physicalDevice, const vk::Device &device, 
+    const vk::SurfaceKHR &surface, const Window &window) {
+    init(instance, physicalDevice, device, surface, window);
 }
 
 ff::Swapchain::~Swapchain() {
+    
+}
+
+void ff::Swapchain::init(const vk::Instance &instance, const ff::PhysicalDevice &physicalDevice, const vk::Device &device, 
+    const vk::SurfaceKHR &surface, const Window &window) {
+    auto swapchainSupport = physicalDevice.querySwapchainSupport(surface);
+
+    // Выбор формата изображения
+    auto surfaceFormat = chooseSwapchainSurfaceFormat(swapchainSupport.formats);
+
+    // Выбор режима представления
+    auto presentMode = chooseSwapchainPresentMode(swapchainSupport.presentModes);
+
+    // Выбор размеров изображения
+    auto extent = chooseSwapchainExtent(swapchainSupport.capabilities, window);
+
+    // определяем минимальное количество изображения, которое требуется для работы
+    // и увеличиваем его на 1 для оптимизации работы драйвера
+    uint32_t imageCount = swapchainSupport.capabilities.surfaceCapabilities.minImageCount + 1;
+    // проверяем, что не превышаем максимальное количество изображений,
+    // делая это, где 0 — это особое значение, которое означает, что максимума нет
+    if (swapchainSupport.capabilities.surfaceCapabilities.maxImageCount > 0 && 
+        imageCount > swapchainSupport.capabilities.surfaceCapabilities.maxImageCount) {
+        imageCount = swapchainSupport.capabilities.surfaceCapabilities.maxImageCount;
+    }
+
+    // Создание свапчейна
+    vk::SwapchainCreateInfoKHR swapchainCreateInfo{};
+    swapchainCreateInfo.setSurface(surface);
+    swapchainCreateInfo.setMinImageCount(imageCount);
+    swapchainCreateInfo.setImageFormat(surfaceFormat.surfaceFormat.format);
+    swapchainCreateInfo.setImageColorSpace(surfaceFormat.surfaceFormat.colorSpace);
+    swapchainCreateInfo.setImageExtent(extent);
+    swapchainCreateInfo.setImageArrayLayers(1); // поверхность с одним представлением
+    swapchainCreateInfo.setImageUsage(vk::ImageUsageFlagBits::eColorAttachment); // изображение используется в качестве цветового прикрепления
+
+    uint32_t graphicsQueueIndex = physicalDevice.selectGraphicsQueueFamilyIndex();
+    uint32_t presentationQueueIndex = physicalDevice.selectPresentationQueueFamilyIndex(surface);
+    std::vector<uint32_t> queueFamilyIndicies{graphicsQueueIndex, presentationQueueIndex};
+
+    // если семейство графической очереди отличается от очереди представления 
+    if (graphicsQueueIndex != presentationQueueIndex) {
+        swapchainCreateInfo.setImageSharingMode(vk::SharingMode::eConcurrent);    // обе очереди совместно владеют изображением
+        swapchainCreateInfo.setQueueFamilyIndexCount(queueFamilyIndicies.size()); // две очереди
+        swapchainCreateInfo.setPQueueFamilyIndices(queueFamilyIndicies.data());   // массив индексов семейств очередей
+    } else {
+        swapchainCreateInfo.setImageSharingMode(vk::SharingMode::eExclusive);// изображением владеет одна очередь
+    }
+
+    // не применяем никаких преобразований
+    swapchainCreateInfo.setPreTransform(swapchainSupport.capabilities.surfaceCapabilities.currentTransform);
+    // игнорирум альфа-канал
+    swapchainCreateInfo.setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque);
+
+    swapchainCreateInfo.setPresentMode(presentMode); // режим представления
+    swapchainCreateInfo.setClipped(vk::True);        // включаем обрезку скрытых пикселей
+
+    try {
+        swapchain = device.createSwapchainKHR(swapchainCreateInfo);
+    } catch (const std::exception &ex) {
+        std::cerr << "Failed to create Swapchain: " << ex.what() << std::endl;
+    }
+}
+
+void ff::Swapchain::destroy(const vk::Device &device) const {
+    device.destroySwapchainKHR(swapchain);
 }
 
 vk::SurfaceFormat2KHR ff::Swapchain::chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormat2KHR> &availableFormats) {
@@ -22,7 +83,6 @@ vk::SurfaceFormat2KHR ff::Swapchain::chooseSwapchainSurfaceFormat(const std::vec
             availableFormat.surfaceFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
             return availableFormat;
         }
-
     }
 
     return availableFormats[0];

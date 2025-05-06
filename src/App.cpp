@@ -5,9 +5,11 @@ ff::App::App(const Window &window) {
     createSurface(window);
     physicalDevice = ff::PhysicalDevice::selectPhysicalDevice(instance);
     createDevice();
+    swapchain.init(instance, physicalDevice, device, surface, window);
 }
 
 ff::App::~App() {
+    swapchain.destroy(device);
     device.destroy();
     instance.destroySurfaceKHR(surface);
     instance.destroy();
@@ -56,6 +58,7 @@ const std::vector<const char*> ff::App::getExtensions() const {
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
     std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    extensions.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
 
 #ifndef NDEBUG
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -117,8 +120,4 @@ void ff::App::createSurface(const Window &window) {
 
     // Оборачиваем VkSurfaceKHR в vk::SurfaceKHR
     surface = vk::SurfaceKHR(rawSurface);
-}
-
-void ff::App::createSwapchain(const vk::SurfaceKHR &surface) {
-    auto swapChainSupportData = physicalDevice.querySwapChainSupport(surface);
 }
