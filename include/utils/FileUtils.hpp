@@ -3,6 +3,6 @@
 
 namespace ff {
     namespace utils {
-        std::vector<char> readFile(const std::string &filename);
+        std::vector<uint32_t> readFile(const std::string &filename);
     }
 }

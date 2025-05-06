@@ -7,10 +7,11 @@ ff::App::App(const Window &window) {
     createDevice();
     swapchain.init(instance, physicalDevice, device, surface, window);
     createImageViews();
-    pipeline.readShaders("D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
+    pipeline.init(device, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
 }
 
 ff::App::~App() {
+    pipeline.destroy(device);
     swapchain.destroy(device);
     destroyImageViews();
     device.destroyRenderPass(renderPass);
