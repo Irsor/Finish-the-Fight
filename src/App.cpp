@@ -58,7 +58,7 @@ const std::vector<const char*> ff::App::getExtensions() const {
     std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
 #ifndef NDEBUG
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
     return extensions;
@@ -80,9 +80,23 @@ void ff::App::createDevice() {
         deviceQueueCreateInfo.push_back(queueCreateInfo);
     }
 
+    // Подключаемые расширения
+    std::vector<const char *> deviceExtensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME
+    };
+
+    // На будущее
+    vk::PhysicalDeviceFeatures features{};
+    features.geometryShader = vk::True;
+    features.tessellationShader = vk::True;
+
     vk::DeviceCreateInfo deviceCreateInfo{};
     deviceCreateInfo.setQueueCreateInfoCount(static_cast<uint32_t>(deviceQueueCreateInfo.size()));
     deviceCreateInfo.setPQueueCreateInfos(deviceQueueCreateInfo.data());
+    deviceCreateInfo.setEnabledExtensionCount(static_cast<uint32_t>(deviceExtensions.size()));
+    deviceCreateInfo.setPpEnabledExtensionNames(deviceExtensions.data());
+    deviceCreateInfo.setPEnabledFeatures(&features);
 
     try {
         device = physicalDevice.getDevice().createDevice(deviceCreateInfo);
@@ -103,4 +117,8 @@ void ff::App::createSurface(const Window &window) {
 
     // Оборачиваем VkSurfaceKHR в vk::SurfaceKHR
     surface = vk::SurfaceKHR(rawSurface);
+}
+
+void ff::App::createSwapchain(const vk::SurfaceKHR &surface) {
+    auto swapChainSupportData = physicalDevice.querySwapChainSupport(surface);
 }

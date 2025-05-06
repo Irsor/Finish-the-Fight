@@ -44,6 +44,26 @@ uint32_t ff::PhysicalDevice::selectPresentationQueueFamilyIndex(const vk::Surfac
     throw std::runtime_error("No suitable presentation queue family found.");
 }
 
+ff::SwapChainSupportDetails ff::PhysicalDevice::querySwapchainSupport(vk::SurfaceKHR surface) const {
+    // провер€ем поддерживаемые возможности
+    vk::PhysicalDeviceSurfaceInfo2KHR surfaceInfo{};
+    surfaceInfo.setSurface(surface);
+
+    auto surfaceCapabilities = device.getSurfaceCapabilities2KHR(surfaceInfo);
+
+    // получаем все поддерживаемые форматы
+    auto surfaceFormats = device.getSurfaceFormats2KHR(surfaceInfo);
+
+    // получаем все поддерживаемые режимы представлени€
+    auto presentModes = device.getSurfacePresentModesKHR(surface);
+
+    SwapChainSupportDetails result{};
+    result.capabilities = surfaceCapabilities;
+    result.formats = surfaceFormats;
+    result.presentModes = presentModes;
+    return result;
+}
+
 vk::PhysicalDevice ff::PhysicalDevice::getDevice() const {
     return device;
 }

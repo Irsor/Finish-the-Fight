@@ -26,12 +26,16 @@ namespace ff {
         // Создание логического устройства
         void createDevice();
 
-        // Создаение поверхности
+        // Создание поверхности
         void createSurface(const Window &window);
+
+        // Создание цепочки буферов
+        void createSwapchain(const vk::SurfaceKHR &surface);
 
         vk::Instance instance{};
         ff::PhysicalDevice physicalDevice{};
         vk::Device device{};
         vk::SurfaceKHR surface{};
+        vk::SwapchainKHR swapchain{};
     };
 }
