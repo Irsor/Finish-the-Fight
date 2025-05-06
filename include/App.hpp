@@ -35,6 +35,9 @@ namespace ff {
         void createImageViews();
         void destroyImageViews() const;
 
+        // Создание прохода рендера
+        void createRenderPass();
+
         vk::Instance instance{};
         ff::PhysicalDevice physicalDevice{};
         vk::Device device{};
@@ -42,5 +45,6 @@ namespace ff {
         ff::Swapchain swapchain{};
         std::vector<vk::ImageView> imageViews{};
         ff::Pipeline pipeline{};
+        vk::RenderPass renderPass{};
     };
 }

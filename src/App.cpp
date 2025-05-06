@@ -13,6 +13,7 @@ ff::App::App(const Window &window) {
 ff::App::~App() {
     swapchain.destroy(device);
     destroyImageViews();
+    device.destroyRenderPass(renderPass);
     device.destroy();
     instance.destroySurfaceKHR(surface);
     instance.destroy();
@@ -163,5 +164,68 @@ void ff::App::createImageViews() {
 void ff::App::destroyImageViews() const {
     for (const auto& imageView : imageViews) {
         device.destroyImageView(imageView);
+    }
+}
+
+void ff::App::createRenderPass() {
+    // 1. Описание цветового вложения
+    vk::AttachmentDescription colorAttachment{};
+    colorAttachment.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format);
+    colorAttachment.setSamples(vk::SampleCountFlagBits::e1);
+    colorAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
+    colorAttachment.setStoreOp(vk::AttachmentStoreOp::eStore);
+    colorAttachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
+    colorAttachment.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
+    colorAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
+    colorAttachment.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+
+    // 2. Описание глубинного вложения
+    vk::AttachmentDescription depthAttachment{};
+    depthAttachment.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format); // <-- убедись, что выбрал подходящий формат
+    depthAttachment.setSamples(vk::SampleCountFlagBits::e1);
+    depthAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
+    depthAttachment.setStoreOp(vk::AttachmentStoreOp::eDontCare);
+    depthAttachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
+    depthAttachment.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
+    depthAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
+    depthAttachment.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+    // 3. Ссылки на вложения для subpass
+    vk::AttachmentReference colorRef{};
+    colorRef.setAttachment(0);
+    colorRef.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+    vk::AttachmentReference depthRef{};
+    depthRef.setAttachment(1);
+    depthRef.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+    // 4. Описание одного subpass
+    vk::SubpassDescription subpass{};
+    subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
+    subpass.setColorAttachments(colorRef);
+    subpass.setPDepthStencilAttachment(&depthRef);
+
+    // 5. Зависимость между внешним и первым subpass
+    vk::SubpassDependency dependency{};
+    dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL);
+    dependency.setDstSubpass(0);
+    dependency.setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    dependency.setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    dependency.setSrcAccessMask({});
+    dependency.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
+
+    // 6. Собираем RenderPass
+    std::array<vk::AttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+
+    vk::RenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.setAttachments(attachments);
+    renderPassInfo.setSubpasses(subpass);
+    renderPassInfo.setDependencies(dependency);
+
+    // 7. Создание RenderPass
+    try {
+        renderPass = device.createRenderPass(renderPassInfo);
+    } catch (const std::exception &ex) {
+        std::cerr << "Failed to create render pass: " << ex.what() << std::endl;
     }
 }
