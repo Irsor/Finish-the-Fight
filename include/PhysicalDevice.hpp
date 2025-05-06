@@ -12,7 +12,8 @@ namespace ff {
         ~PhysicalDevice();
 
         void displayQueueFamily() const;
-        uint32_t selectGraphicsQueueIndex() const; 
+        uint32_t selectGraphicsQueueFamilyIndex() const; 
+        uint32_t selectPresentationQueueFamilyIndex(const vk::SurfaceKHR &surface) const;
 
         vk::PhysicalDevice getDevice() const; 
 

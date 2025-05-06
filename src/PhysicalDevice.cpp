@@ -20,7 +20,7 @@ void ff::PhysicalDevice::displayQueueFamily() const {
     }
 }
 
-uint32_t ff::PhysicalDevice::selectGraphicsQueueIndex() const {
+uint32_t ff::PhysicalDevice::selectGraphicsQueueFamilyIndex() const {
     std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
 
     for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilies.size()); ++i) {
@@ -30,6 +30,18 @@ uint32_t ff::PhysicalDevice::selectGraphicsQueueIndex() const {
     }
 
     throw std::runtime_error("No suitable graphics queue family found.");
+}
+
+uint32_t ff::PhysicalDevice::selectPresentationQueueFamilyIndex(const vk::SurfaceKHR &surface) const {
+    std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
+
+    for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilies.size()); ++i) {
+        if (device.getSurfaceSupportKHR(i, surface)) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("No suitable presentation queue family found.");
 }
 
 vk::PhysicalDevice ff::PhysicalDevice::getDevice() const {

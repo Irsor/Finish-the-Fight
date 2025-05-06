@@ -65,17 +65,24 @@ const std::vector<const char*> ff::App::getExtensions() const {
 }
 
 void ff::App::createDevice() {
-    uint32_t queueIndex = physicalDevice.selectGraphicsQueueIndex();
+    uint32_t graphicsQueueIndex = physicalDevice.selectGraphicsQueueFamilyIndex();
+    uint32_t presentationQueueIndex = physicalDevice.selectPresentationQueueFamilyIndex(surface);
     float queuePriority = 1.0f;
 
-    vk::DeviceQueueCreateInfo queueCreateInfo{};
-    queueCreateInfo.setQueueFamilyIndex(queueIndex);
-    queueCreateInfo.setQueueCount(1);
-    queueCreateInfo.setPQueuePriorities(&queuePriority);
+    std::set<uint32_t> uniqueQueueFamilies = {graphicsQueueIndex, presentationQueueIndex};
+    std::vector<vk::DeviceQueueCreateInfo> deviceQueueCreateInfo{};
+
+    for (auto queueFamily : uniqueQueueFamilies) {
+        vk::DeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.setQueueFamilyIndex(queueFamily);
+        queueCreateInfo.setQueueCount(1);
+        queueCreateInfo.setPQueuePriorities(&queuePriority);
+        deviceQueueCreateInfo.push_back(queueCreateInfo);
+    }
 
     vk::DeviceCreateInfo deviceCreateInfo{};
-    deviceCreateInfo.setQueueCreateInfoCount(1);
-    deviceCreateInfo.setPQueueCreateInfos(&queueCreateInfo);
+    deviceCreateInfo.setQueueCreateInfoCount(static_cast<uint32_t>(deviceQueueCreateInfo.size()));
+    deviceCreateInfo.setPQueueCreateInfos(deviceQueueCreateInfo.data());
 
     try {
         device = physicalDevice.getDevice().createDevice(deviceCreateInfo);
