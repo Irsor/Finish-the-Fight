@@ -7,7 +7,8 @@ ff::App::App(const Window &window) {
     createDevice();
     swapchain.init(instance, physicalDevice, device, surface, window);
     createImageViews();
-    pipeline.init(device, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
+    createRenderPass();
+    pipeline.init(device, swapchain, renderPass, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
 }
 
 ff::App::~App() {
@@ -168,8 +169,27 @@ void ff::App::destroyImageViews() const {
     }
 }
 
+vk::Format ff::App::findSupportedDepthFormat() {
+    std::vector<vk::Format> candidates = {
+            vk::Format::eD32Sfloat,
+            vk::Format::eD24UnormS8Uint,
+            vk::Format::eD16Unorm};
+
+    for (vk::Format format: candidates) {
+        auto props = physicalDevice.getDevice().getFormatProperties(format);
+        if ((props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment)) {
+            return format;
+        }
+    }
+
+    throw std::runtime_error("No supported depth format found!");
+}
+
 void ff::App::createRenderPass() {
-    // 1. Описание цветового вложения
+    // Получаем поддерживаемый формат глубины
+    vk::Format depthFormat = findSupportedDepthFormat();
+
+    // 1. Цветовое вложение
     vk::AttachmentDescription colorAttachment{};
     colorAttachment.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format);
     colorAttachment.setSamples(vk::SampleCountFlagBits::e1);
@@ -180,9 +200,9 @@ void ff::App::createRenderPass() {
     colorAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
     colorAttachment.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
 
-    // 2. Описание глубинного вложения
+    // 2. Глубинное вложение (с корректным форматом!)
     vk::AttachmentDescription depthAttachment{};
-    depthAttachment.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format); // <-- убедись, что выбрал подходящий формат
+    depthAttachment.setFormat(depthFormat);
     depthAttachment.setSamples(vk::SampleCountFlagBits::e1);
     depthAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
     depthAttachment.setStoreOp(vk::AttachmentStoreOp::eDontCare);
@@ -191,7 +211,7 @@ void ff::App::createRenderPass() {
     depthAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
     depthAttachment.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-    // 3. Ссылки на вложения для subpass
+    // 3. Ссылки
     vk::AttachmentReference colorRef{};
     colorRef.setAttachment(0);
     colorRef.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
@@ -200,13 +220,13 @@ void ff::App::createRenderPass() {
     depthRef.setAttachment(1);
     depthRef.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-    // 4. Описание одного subpass
+    // 4. Subpass
     vk::SubpassDescription subpass{};
     subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
     subpass.setColorAttachments(colorRef);
     subpass.setPDepthStencilAttachment(&depthRef);
 
-    // 5. Зависимость между внешним и первым subpass
+    // 5. Зависимости
     vk::SubpassDependency dependency{};
     dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL);
     dependency.setDstSubpass(0);
@@ -215,7 +235,7 @@ void ff::App::createRenderPass() {
     dependency.setSrcAccessMask({});
     dependency.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
 
-    // 6. Собираем RenderPass
+    // 6. RenderPass
     std::array<vk::AttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
 
     vk::RenderPassCreateInfo renderPassInfo{};

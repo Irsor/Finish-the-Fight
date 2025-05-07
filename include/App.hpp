@@ -34,6 +34,7 @@ namespace ff {
         // Создание представлений изображений и удаление
         void createImageViews();
         void destroyImageViews() const;
+        vk::Format findSupportedDepthFormat();
 
         // Создание прохода рендера
         void createRenderPass();

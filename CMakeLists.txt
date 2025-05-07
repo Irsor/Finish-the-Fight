@@ -28,6 +28,15 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glfw)
 
+# glm
+FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG        1.0.1
+)
+
+FetchContent_MakeAvailable(glm)
+
 add_executable(${PROJECT_NAME} main.cpp
     src/App.cpp
     src/PhysicalDevice.cpp
@@ -41,6 +50,7 @@ add_executable(${PROJECT_NAME} main.cpp
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${vulkan-hpp_SOURCE_DIR}/include
+        ${glm_SOURCE_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

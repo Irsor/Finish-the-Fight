@@ -20,10 +20,10 @@ void ff::Swapchain::init(const vk::Instance &instance, const ff::PhysicalDevice 
     surfaceFormat = chooseSwapchainSurfaceFormat(swapchainSupport.formats);
 
     // ¬ыбор режима представлени€
-    auto presentMode = chooseSwapchainPresentMode(swapchainSupport.presentModes);
+    presentMode = chooseSwapchainPresentMode(swapchainSupport.presentModes);
 
     // ¬ыбор размеров изображени€
-    auto extent = chooseSwapchainExtent(swapchainSupport.capabilities, window);
+    extent = chooseSwapchainExtent(swapchainSupport.capabilities, window);
 
     // определ€ем минимальное количество изображени€, которое требуетс€ дл€ работы
     // и увеличиваем его на 1 дл€ оптимизации работы драйвера
@@ -83,6 +83,14 @@ vk::SwapchainKHR ff::Swapchain::get() const {
 
 vk::SurfaceFormat2KHR ff::Swapchain::getSurfaceFormat() const {
     return surfaceFormat;
+}
+
+vk::PresentModeKHR ff::Swapchain::getPresentMode() const {
+    return presentMode;
+}
+
+vk::Extent2D ff::Swapchain::getExtent() const {
+    return extent;
 }
 
 vk::SurfaceFormat2KHR ff::Swapchain::chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormat2KHR> &availableFormats) {

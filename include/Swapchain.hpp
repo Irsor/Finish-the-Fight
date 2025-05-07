@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 
 #include <vulkan/vulkan.hpp>
@@ -17,6 +19,8 @@ namespace ff {
 
         vk::SwapchainKHR get() const;
         vk::SurfaceFormat2KHR getSurfaceFormat() const;
+        vk::PresentModeKHR getPresentMode() const;
+        vk::Extent2D getExtent() const;
 
     private:
         vk::SurfaceFormat2KHR chooseSwapchainSurfaceFormat(const std::vector<vk::SurfaceFormat2KHR> &availableFormats);
@@ -26,5 +30,7 @@ namespace ff {
         vk::SwapchainKHR swapchain{};
 
         vk::SurfaceFormat2KHR surfaceFormat{};
+        vk::PresentModeKHR presentMode{};
+        vk::Extent2D extent{};
     };
 }
