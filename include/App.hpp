@@ -43,6 +43,9 @@ namespace ff {
         void createFrameBuffers();
         void destroyFramebuffers() const;
 
+        // Создание пула команд
+        void createCommandPool();
+
         vk::Instance instance{};
         ff::PhysicalDevice physicalDevice{};
         vk::Device device{};
@@ -52,5 +55,6 @@ namespace ff {
         ff::Pipeline pipeline{};
         vk::RenderPass renderPass{};
         std::vector<vk::Framebuffer> framebuffers{};
+        vk::UniqueCommandPool commandPool;
     };
 }

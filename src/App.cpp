@@ -10,6 +10,7 @@ ff::App::App(const Window &window) {
     createRenderPass();
     pipeline.init(device, swapchain, renderPass, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
     createFrameBuffers();
+    createCommandPool();
 }
 
 ff::App::~App() {
@@ -274,5 +275,17 @@ void ff::App::createFrameBuffers() {
 void ff::App::destroyFramebuffers() const {
     for (const auto& framebuffer : framebuffers) {
         device.destroyFramebuffer(framebuffer);
+    }
+}
+
+void ff::App::createCommandPool() {
+    vk::CommandPoolCreateInfo poolCreateInfo{};
+    poolCreateInfo.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+    poolCreateInfo.setQueueFamilyIndex(physicalDevice.selectGraphicsQueueFamilyIndex());
+    
+    try {
+        commandPool = device.createCommandPoolUnique(poolCreateInfo);
+    } catch (const std::exception &ex) {
+        std::cerr << "Failed to create command pool: " << ex.what() << std::endl;
     }
 }
