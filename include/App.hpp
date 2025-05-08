@@ -39,6 +39,10 @@ namespace ff {
         // Создание прохода рендера
         void createRenderPass();
 
+        // Создание фреймбуфферов
+        void createFrameBuffers();
+        void destroyFramebuffers() const;
+
         vk::Instance instance{};
         ff::PhysicalDevice physicalDevice{};
         vk::Device device{};
@@ -47,5 +51,6 @@ namespace ff {
         std::vector<vk::ImageView> imageViews{};
         ff::Pipeline pipeline{};
         vk::RenderPass renderPass{};
+        std::vector<vk::Framebuffer> framebuffers{};
     };
 }
