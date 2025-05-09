@@ -144,6 +144,10 @@ void ff::Pipeline::destroy(const vk::Device &device) const {
     if (fragmentShaderModule) device.destroyShaderModule(fragmentShaderModule);
 }
 
+vk::Pipeline ff::Pipeline::get() const {
+    return pipeline;
+}
+
 vk::ShaderModule ff::Pipeline::createShaderModule(const vk::Device &device, const std::vector<uint32_t> &shaderBianary) const {
     vk::ShaderModuleCreateInfo createInfo{};
     createInfo.setCodeSize(shaderBianary.size() * sizeof(uint32_t));

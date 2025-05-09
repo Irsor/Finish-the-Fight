@@ -11,6 +11,7 @@ ff::App::App(const Window &window) {
     pipeline.init(device, swapchain, renderPass, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
     createFrameBuffers();
     createCommandPool();
+    createSyncObjects();
 }
 
 ff::App::~App() {
@@ -287,5 +288,72 @@ void ff::App::createCommandPool() {
         commandPool = device.createCommandPoolUnique(poolCreateInfo);
     } catch (const std::exception &ex) {
         std::cerr << "Failed to create command pool: " << ex.what() << std::endl;
+    }
+}
+
+void ff::App::allocateCommandBuffers() {
+    
+    // Создание
+    vk::CommandBufferAllocateInfo allocateInfo{};
+    allocateInfo.setCommandPool(commandPool.get());
+    allocateInfo.setLevel(vk::CommandBufferLevel::ePrimary);
+    allocateInfo.setCommandBufferCount(static_cast<uint32_t>(imageViews.size()));
+
+    try {
+        commandBuffers = device.allocateCommandBuffersUnique(allocateInfo);
+    } catch (const std::exception &ex) {
+        std::cerr << "Failed to create command buffers: " << ex.what() << std::endl;
+    }
+
+    // Запись
+    for (uint32_t i = 0; i < commandBuffers.size(); i++) {
+        vk::CommandBufferBeginInfo beginInfo{};
+        beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+        try {
+            commandBuffers[i]->begin(beginInfo);
+
+            // Данные для ренедера
+            vk::Rect2D renderArea{};
+            renderArea.setExtent(swapchain.getExtent());
+            vk::ClearValue clearColor;
+            clearColor.setColor({0.0f, 0.0f, 0.0f, 1.0f});
+
+            // ---
+            vk::RenderPassBeginInfo renderPassBeginInfo{};
+            renderPassBeginInfo.setRenderPass(renderPass);
+            renderPassBeginInfo.setFramebuffer(framebuffers[i]);
+            renderPassBeginInfo.setRenderArea(renderArea);
+            renderPassBeginInfo.setClearValueCount(1);
+            renderPassBeginInfo.setClearValues({clearColor});
+
+            try {
+                // Запись данных
+                commandBuffers[i]->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+                commandBuffers[i]->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.get());
+                commandBuffers[i]->draw(3, 1, 0, 0);
+                commandBuffers[i]->endRenderPass();
+            } catch (const std::exception &ex) {
+                std::cerr << "Failed to write data into: " << ex.what() << std::endl;
+            }
+
+            commandBuffers[i]->end();
+
+        } catch (const std::exception &ex) {
+            std::cerr << "Failed to write command into a command buffer: " << ex.what() << std::endl;
+        }        
+    }
+}
+
+void ff::App::createSyncObjects() {
+    vk::SemaphoreCreateInfo semaphoreCreateInfo{};
+    vk::FenceCreateInfo fenseCreateInfo{};
+
+    try {
+        imageAvailableSemaphore = device.createSemaphoreUnique(semaphoreCreateInfo);
+        renderFinishedSemaphore = device.createSemaphoreUnique(semaphoreCreateInfo);
+        inFlightFense = device.createFenceUnique(fenseCreateInfo);
+    } catch (const std::exception &ex) {
+        std::cerr << "Failed to craete sync objects: " << ex.what() << std::endl;
     }
 }

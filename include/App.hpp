@@ -46,6 +46,12 @@ namespace ff {
         // Создание пула команд
         void createCommandPool();
 
+        // Создание буфера команд и запись в них данных
+        void allocateCommandBuffers();
+
+        // Семафоры и fence
+        void createSyncObjects();
+
         vk::Instance instance{};
         ff::PhysicalDevice physicalDevice{};
         vk::Device device{};
@@ -55,6 +61,12 @@ namespace ff {
         ff::Pipeline pipeline{};
         vk::RenderPass renderPass{};
         std::vector<vk::Framebuffer> framebuffers{};
-        vk::UniqueCommandPool commandPool;
+        vk::UniqueCommandPool commandPool{};
+        std::vector<vk::UniqueCommandBuffer> commandBuffers{};
+
+        // Объекты синхронизации
+        vk::UniqueSemaphore imageAvailableSemaphore{};
+        vk::UniqueSemaphore renderFinishedSemaphore{};
+        vk::UniqueFence inFlightFense{};
     };
 }
