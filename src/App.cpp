@@ -11,15 +11,22 @@ ff::App::App(const Window &window) {
     pipeline.init(device, swapchain, renderPass, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
     createFrameBuffers();
     createCommandPool();
+    allocateCommandBuffers();
     createSyncObjects();
 }
 
 ff::App::~App() {
+    device.waitIdle();
     pipeline.destroy(device);
     swapchain.destroy(device);
     destroyImageViews();
     destroyFramebuffers();
     device.destroyRenderPass(renderPass);
+    device.destroySemaphore(imageAvailableSemaphore);
+    device.destroySemaphore(renderFinishedSemaphore);
+    device.destroyFence(inFlightFense);
+    device.freeCommandBuffers(commandPool, commandBuffers);    
+    device.destroyCommandPool(commandPool);
     device.destroy();
     instance.destroySurfaceKHR(surface);
     instance.destroy();
@@ -96,7 +103,8 @@ void ff::App::createDevice() {
     // Подключаемые расширения
     std::vector<const char *> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME
+        VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
     };
 
     // На будущее
@@ -113,9 +121,15 @@ void ff::App::createDevice() {
 
     try {
         device = physicalDevice.getDevice().createDevice(deviceCreateInfo);
+        graphicsQueue = device.getQueue(graphicsQueueIndex, 0);
+        presentQueue = device.getQueue(presentationQueueIndex, 0);
     } catch (const std::exception &ex) {
         std::cerr << "Failed to create Device: " << ex.what() << std::endl;
     }
+}
+
+void ff::App::createQueues() {
+    //graphicsQueue = device.getQueue(physicalDevice.selectGraphicsQueueFamilyIndex(), 0);
 }
 
 void ff::App::createSurface(const Window &window) {
@@ -285,7 +299,7 @@ void ff::App::createCommandPool() {
     poolCreateInfo.setQueueFamilyIndex(physicalDevice.selectGraphicsQueueFamilyIndex());
     
     try {
-        commandPool = device.createCommandPoolUnique(poolCreateInfo);
+        commandPool = device.createCommandPool(poolCreateInfo);
     } catch (const std::exception &ex) {
         std::cerr << "Failed to create command pool: " << ex.what() << std::endl;
     }
@@ -295,23 +309,25 @@ void ff::App::allocateCommandBuffers() {
     
     // Создание
     vk::CommandBufferAllocateInfo allocateInfo{};
-    allocateInfo.setCommandPool(commandPool.get());
+    allocateInfo.setCommandPool(commandPool);
     allocateInfo.setLevel(vk::CommandBufferLevel::ePrimary);
     allocateInfo.setCommandBufferCount(static_cast<uint32_t>(imageViews.size()));
 
     try {
-        commandBuffers = device.allocateCommandBuffersUnique(allocateInfo);
+        commandBuffers = device.allocateCommandBuffers(allocateInfo);
     } catch (const std::exception &ex) {
         std::cerr << "Failed to create command buffers: " << ex.what() << std::endl;
     }
+}
 
+void ff::App::writeDataIntoCommandBuffers(uint32_t imageIndex) {
     // Запись
     for (uint32_t i = 0; i < commandBuffers.size(); i++) {
         vk::CommandBufferBeginInfo beginInfo{};
         beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
         try {
-            commandBuffers[i]->begin(beginInfo);
+            commandBuffers[i].begin(beginInfo);
 
             // Данные для ренедера
             vk::Rect2D renderArea{};
@@ -329,31 +345,80 @@ void ff::App::allocateCommandBuffers() {
 
             try {
                 // Запись данных
-                commandBuffers[i]->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
-                commandBuffers[i]->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.get());
-                commandBuffers[i]->draw(3, 1, 0, 0);
-                commandBuffers[i]->endRenderPass();
+                commandBuffers[i].beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+                commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.get());
+                commandBuffers[i].draw(3, 1, 0, 0);
+                commandBuffers[i].endRenderPass();
             } catch (const std::exception &ex) {
                 std::cerr << "Failed to write data into: " << ex.what() << std::endl;
             }
 
-            commandBuffers[i]->end();
+            commandBuffers[i].end();
 
         } catch (const std::exception &ex) {
             std::cerr << "Failed to write command into a command buffer: " << ex.what() << std::endl;
-        }        
+        }
     }
 }
 
 void ff::App::createSyncObjects() {
     vk::SemaphoreCreateInfo semaphoreCreateInfo{};
     vk::FenceCreateInfo fenseCreateInfo{};
+    fenseCreateInfo.setFlags(vk::FenceCreateFlagBits::eSignaled);
 
     try {
-        imageAvailableSemaphore = device.createSemaphoreUnique(semaphoreCreateInfo);
-        renderFinishedSemaphore = device.createSemaphoreUnique(semaphoreCreateInfo);
-        inFlightFense = device.createFenceUnique(fenseCreateInfo);
+        imageAvailableSemaphore = device.createSemaphore(semaphoreCreateInfo);
+        renderFinishedSemaphore = device.createSemaphore(semaphoreCreateInfo);
+        inFlightFense = device.createFence(fenseCreateInfo);
     } catch (const std::exception &ex) {
         std::cerr << "Failed to craete sync objects: " << ex.what() << std::endl;
+    }
+}
+
+void ff::App::drawFrame() {
+    // Ждём завершения предыдущего кадра
+    // device.waitForFences({inFlightFence.get()}, vk::True, UINT64_MAX);
+    device.waitForFences({inFlightFense}, vk::True, UINT64_MAX);
+    device.resetFences(inFlightFense);
+
+    // Получаем изображение из цепочки свопчейна
+    vk::AcquireNextImageInfoKHR imageInfo{};
+    imageInfo.setSwapchain(swapchain.get());
+    imageInfo.setTimeout(UINT64_MAX);
+    imageInfo.setSemaphore(imageAvailableSemaphore);
+    imageInfo.setDeviceMask(1);// всё равно нужен, так как используем acquireNextImage2KHR
+
+    auto [result, imageIndex] = device.acquireNextImage2KHR(imageInfo);
+
+    if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+        throw std::runtime_error("Не удалось получить изображение из swapchain.");
+    }
+
+    // Сброс и запись команд
+    commandBuffers[imageIndex].reset();
+    writeDataIntoCommandBuffers(imageIndex);
+
+    // Настройка обычного submit с vk::SubmitInfo
+    vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+
+    vk::SubmitInfo submitInfo{};
+    submitInfo.setWaitSemaphores(imageAvailableSemaphore);
+    submitInfo.setWaitDstStageMask(waitStage);
+    submitInfo.setCommandBuffers(commandBuffers[imageIndex]);
+    submitInfo.setSignalSemaphores(renderFinishedSemaphore);
+
+    // Submit в графическую очередь
+    graphicsQueue.submit(submitInfo, inFlightFense);
+
+    // Презентация
+    vk::PresentInfoKHR presentInfo{};
+    presentInfo.setWaitSemaphores(renderFinishedSemaphore);
+    std::vector<vk::SwapchainKHR> swapchains = {swapchain.get()};
+    presentInfo.setSwapchains(swapchains);
+    presentInfo.setImageIndices(imageIndex);
+
+    vk::Result presentResult = presentQueue.presentKHR(&presentInfo);
+    if (presentResult != vk::Result::eSuccess && presentResult != vk::Result::eSuboptimalKHR) {
+        throw std::runtime_error("Не удалось представить изображение.");
     }
 }

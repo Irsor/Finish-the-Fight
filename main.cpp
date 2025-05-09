@@ -11,6 +11,7 @@ int main() {
 
     while (!glfwWindowShouldClose(window.get())) {
         glfwPollEvents();
+        app.drawFrame();
     }
 
     return 0;

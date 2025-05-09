@@ -33,11 +33,18 @@ void ff::Pipeline::init(const vk::Device &device, const ff::Swapchain &swapchain
     auto attributeDescriptions = ff::Vertex::getAttributeDescriptions();
 
     // Формат данных вершин, которые будут переданы в вершинный шейдер
+    // 
+    // ПУСТО
+    // 
+    // vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
+    // vertexInputStateCreateInfo.setVertexBindingDescriptionCount(1);
+    // vertexInputStateCreateInfo.setPVertexBindingDescriptions(&bindingDescription);
+    // vertexInputStateCreateInfo.setVertexAttributeDescriptionCount(static_cast<uint32_t>(attributeDescriptions.size()));
+    // vertexInputStateCreateInfo.setPVertexAttributeDescriptions(attributeDescriptions.data());
+
     vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
-    vertexInputStateCreateInfo.setVertexBindingDescriptionCount(1);
-    vertexInputStateCreateInfo.setPVertexBindingDescriptions(&bindingDescription);
-    vertexInputStateCreateInfo.setVertexAttributeDescriptionCount(static_cast<uint32_t>(attributeDescriptions.size()));
-    vertexInputStateCreateInfo.setPVertexAttributeDescriptions(attributeDescriptions.data());
+    vertexInputStateCreateInfo.setVertexBindingDescriptions({});// Пусто
+    vertexInputStateCreateInfo.setVertexAttributeDescriptions({});// Пусто
 
     // Параметры сборки входных данных конвеера
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo{};

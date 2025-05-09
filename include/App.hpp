@@ -19,6 +19,8 @@ namespace ff {
         App(const Window &window);
         ~App();
 
+        void drawFrame();
+
     private:
 
         // Создание инстанса
@@ -27,6 +29,9 @@ namespace ff {
 
         // Создание логического устройства
         void createDevice();
+
+        // Создание очередей
+        void createQueues();
 
         // Создание поверхности
         void createSurface(const Window &window);
@@ -46,8 +51,11 @@ namespace ff {
         // Создание пула команд
         void createCommandPool();
 
-        // Создание буфера команд и запись в них данных
+        // Создание буфера команд
         void allocateCommandBuffers();
+
+        // Запись данных в буфер команд
+        void writeDataIntoCommandBuffers(uint32_t imageIndex);
 
         // Семафоры и fence
         void createSyncObjects();
@@ -61,12 +69,18 @@ namespace ff {
         ff::Pipeline pipeline{};
         vk::RenderPass renderPass{};
         std::vector<vk::Framebuffer> framebuffers{};
-        vk::UniqueCommandPool commandPool{};
-        std::vector<vk::UniqueCommandBuffer> commandBuffers{};
+        vk::CommandPool commandPool{};
+        std::vector<vk::CommandBuffer> commandBuffers{};
+
+        // ---
+        // Очереди
+        vk::Queue graphicsQueue{};
+        vk::Queue presentQueue{};
+        // ---
 
         // Объекты синхронизации
-        vk::UniqueSemaphore imageAvailableSemaphore{};
-        vk::UniqueSemaphore renderFinishedSemaphore{};
-        vk::UniqueFence inFlightFense{};
+        vk::Semaphore imageAvailableSemaphore{};
+        vk::Semaphore renderFinishedSemaphore{};
+        vk::Fence inFlightFense{};
     };
 }
