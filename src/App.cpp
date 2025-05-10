@@ -353,7 +353,7 @@ void ff::App::writeDataIntoCommandBuffers(uint32_t imageIndex) {
             nullptr);
 
     // 5) Рисуем full-screen quad (4 вершины)
-    commandBuffers[imageIndex].draw(4, 1, 0, 0);
+    commandBuffers[imageIndex].draw(6, 1, 0, 0);
 
     // 6) Завершаем рендер-пасс и запись команд
     commandBuffers[imageIndex].endRenderPass();
@@ -390,11 +390,12 @@ void ff::App::drawFrame() {
     if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
         throw std::runtime_error("Не удалось получить изображение из swapchain.");
 
-    // 🔄 Обновление uTime
+    // Обновление uTime
     float timeSeconds = static_cast<float>(std::chrono::duration<double>(
                                                    std::chrono::high_resolution_clock::now().time_since_epoch())
                                                    .count());
-    pipeline.updateUniform(device, timeSeconds);
+
+    pipeline.updateUniform(device, swapchain.getExtent(), timeSeconds);
 
     commandBuffers[imageIndex].reset();
     writeDataIntoCommandBuffers(imageIndex);

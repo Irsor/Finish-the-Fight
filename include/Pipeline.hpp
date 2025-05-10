@@ -20,7 +20,7 @@ namespace ff {
 
         vk::Pipeline get() const;
 
-        void updateUniform(const vk::Device &device, float time);
+        void updateUniform(const vk::Device &device, const vk::Extent2D &resolution, float time);
 
         vk::PipelineLayout getPipelineLayout() const;
         vk::DescriptorSet getDescriptorSet() const;

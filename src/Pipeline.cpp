@@ -13,47 +13,53 @@ void ff::Pipeline::init(
         const std::string &vertexShaderPath,
         const std::string &fragmentShaderPath,
         const ff::PhysicalDevice &physicalDevice) {
-    // 1) Shaders
+    // 1) Загрузка шейдеров
     auto vertCode = ff::utils::readFile(vertexShaderPath);
     auto fragCode = ff::utils::readFile(fragmentShaderPath);
-    vertexShaderModule = createShaderModule(device, vertCode);
+    vertexShaderModule   = createShaderModule(device, vertCode);
     fragmentShaderModule = createShaderModule(device, fragCode);
 
-    vk::PipelineShaderStageCreateInfo vertStage{}, fragStage{};
+    vk::PipelineShaderStageCreateInfo vertStage{};
     vertStage.setStage(vk::ShaderStageFlagBits::eVertex)
-            .setModule(vertexShaderModule)
-            .setPName("main");
+             .setModule(vertexShaderModule)
+             .setPName("main");
+    vk::PipelineShaderStageCreateInfo fragStage{};
     fragStage.setStage(vk::ShaderStageFlagBits::eFragment)
-            .setModule(fragmentShaderModule)
-            .setPName("main");
-    std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {{vertStage, fragStage}};
+             .setModule(fragmentShaderModule)
+             .setPName("main");
+    std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {{ vertStage, fragStage }};
 
-    // 2) Uniform buffer for float uTime
-    struct UBO {
+    // 2) Создание UBO-буфера под std140 binding=0
+    struct alignas(16) UBO {
+        float uResolution[2];
+        float _padding1[2];  // выравнивание vec2 до 16 байт
         float uTime;
+        float _padding2[3];  // выравнивание всей структуры до 16 байт
     };
+
     vk::BufferCreateInfo bufInfo{};
     bufInfo.setSize(sizeof(UBO))
-            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-            .setSharingMode(vk::SharingMode::eExclusive);
+           .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+           .setSharingMode(vk::SharingMode::eExclusive);
     uniformBuffer = device.createBuffer(bufInfo);
 
-    vk::MemoryRequirements memReq = device.getBufferMemoryRequirements(uniformBuffer);
+    auto memReq = device.getBufferMemoryRequirements(uniformBuffer);
     uint32_t memType = physicalDevice.findMemoryType(
-            memReq.memoryTypeBits,
-            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        memReq.memoryTypeBits,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+    );
     vk::MemoryAllocateInfo allocInfo{};
     allocInfo.setAllocationSize(memReq.size)
-            .setMemoryTypeIndex(memType);
+             .setMemoryTypeIndex(memType);
     uniformMemory = device.allocateMemory(allocInfo);
     device.bindBufferMemory(uniformBuffer, uniformMemory, 0);
 
-    // 3) Descriptor set layout (binding 0 = UBO)
+    // 3) DescriptorSetLayout
     vk::DescriptorSetLayoutBinding uboBinding{};
     uboBinding.setBinding(0)
-            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1)
-            .setStageFlags(vk::ShaderStageFlagBits::eFragment);
+              .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+              .setDescriptorCount(1)
+              .setStageFlags(vk::ShaderStageFlagBits::eFragment);
     vk::DescriptorSetLayoutCreateInfo dslInfo{};
     dslInfo.setBindings(uboBinding);
     descriptorSetLayout = device.createDescriptorSetLayout(dslInfo);
@@ -170,14 +176,24 @@ void ff::Pipeline::destroy(const vk::Device &device) const {
 
 vk::Pipeline ff::Pipeline::get() const { return pipeline; }
 
-void ff::Pipeline::updateUniform(const vk::Device &device, float time) {
+// Обновление UBO перед отрисовкой void 
+void ff::Pipeline::updateUniform(
+          const vk::Device &device,
+          const vk::Extent2D &resolution,
+          float time) {
     struct UBO {
+        float uResolution[2];
+        float _padding1[2];
         float uTime;
-    } ubo;
+        float _padding2[3];
+    } ubo{};
+
+    ubo.uResolution[0] = static_cast<float>(resolution.width);
+    ubo.uResolution[1] = static_cast<float>(resolution.height);
     ubo.uTime = time;
 
-    void *data = device.mapMemory(uniformMemory, 0, sizeof(ubo));
-    memcpy(data, &ubo, sizeof(ubo));
+    void *data = device.mapMemory(uniformMemory, 0, sizeof(UBO));
+    memcpy(data, &ubo, sizeof(UBO));
     device.unmapMemory(uniformMemory);
 }
 
