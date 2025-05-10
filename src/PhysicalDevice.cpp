@@ -134,3 +134,16 @@ ff::PhysicalDevice ff::PhysicalDevice::selectPhysicalDevice(const vk::Instance &
         throw std::runtime_error(std::string("selectPhysicalDevice failed: ") + ex.what());
     }
 }
+
+uint32_t ff::PhysicalDevice::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const {
+    vk::PhysicalDeviceMemoryProperties memProperties = device.getMemoryProperties();
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("Failed to find suitable memory type!");
+}

@@ -6,163 +6,194 @@ ff::Pipeline::Pipeline() {
 ff::Pipeline::~Pipeline() {
 }
 
-void ff::Pipeline::init(const vk::Device &device, const ff::Swapchain &swapchain, const vk::RenderPass &renderPass, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
-    // загрузка файлов шейдеров
-    auto vertShaderCode = ff::utils::readFile(vertexShaderPath);
-    auto fragShaderCode = ff::utils::readFile(fragmentShaderPath);
+void ff::Pipeline::init(
+        const vk::Device &device,
+        const ff::Swapchain &swapchain,
+        const vk::RenderPass &renderPass,
+        const std::string &vertexShaderPath,
+        const std::string &fragmentShaderPath,
+        const ff::PhysicalDevice &physicalDevice) {
+    // 1) Shaders
+    auto vertCode = ff::utils::readFile(vertexShaderPath);
+    auto fragCode = ff::utils::readFile(fragmentShaderPath);
+    vertexShaderModule = createShaderModule(device, vertCode);
+    fragmentShaderModule = createShaderModule(device, fragCode);
 
-    // преобразование кода шейдеров в модули шейдеров
-    vertexShaderModule = createShaderModule(device, vertShaderCode);
-    fragmentShaderModule = createShaderModule(device, fragShaderCode);
+    vk::PipelineShaderStageCreateInfo vertStage{}, fragStage{};
+    vertStage.setStage(vk::ShaderStageFlagBits::eVertex)
+            .setModule(vertexShaderModule)
+            .setPName("main");
+    fragStage.setStage(vk::ShaderStageFlagBits::eFragment)
+            .setModule(fragmentShaderModule)
+            .setPName("main");
+    std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {{vertStage, fragStage}};
 
-    // Этап вершинного шейдера
-    vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
-    vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex);// этап: вершинный
-    vertShaderStageInfo.setModule(vertexShaderModule);             // модуль вершинного шейдера
-    vertShaderStageInfo.setPName("main");                          // точка входа — функция main
+    // 2) Uniform buffer for float uTime
+    struct UBO {
+        float uTime;
+    };
+    vk::BufferCreateInfo bufInfo{};
+    bufInfo.setSize(sizeof(UBO))
+            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+            .setSharingMode(vk::SharingMode::eExclusive);
+    uniformBuffer = device.createBuffer(bufInfo);
 
-    // Этап фрагментного шейдера
-    vk::PipelineShaderStageCreateInfo fragShaderStageInfo{};
-    fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment);// этап: фрагментный
-    fragShaderStageInfo.setModule(fragmentShaderModule);             // модуль фрагментного шейдера
-    fragShaderStageInfo.setPName("main");                            // точка входа — функция main
+    vk::MemoryRequirements memReq = device.getBufferMemoryRequirements(uniformBuffer);
+    uint32_t memType = physicalDevice.findMemoryType(
+            memReq.memoryTypeBits,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    vk::MemoryAllocateInfo allocInfo{};
+    allocInfo.setAllocationSize(memReq.size)
+            .setMemoryTypeIndex(memType);
+    uniformMemory = device.allocateMemory(allocInfo);
+    device.bindBufferMemory(uniformBuffer, uniformMemory, 0);
 
-    std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {vertShaderStageInfo, fragShaderStageInfo};
+    // 3) Descriptor set layout (binding 0 = UBO)
+    vk::DescriptorSetLayoutBinding uboBinding{};
+    uboBinding.setBinding(0)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eFragment);
+    vk::DescriptorSetLayoutCreateInfo dslInfo{};
+    dslInfo.setBindings(uboBinding);
+    descriptorSetLayout = device.createDescriptorSetLayout(dslInfo);
 
-    auto bindingDescription = ff::Vertex::getBindingDescription();
-    auto attributeDescriptions = ff::Vertex::getAttributeDescriptions();
+    // 4) Pipeline layout with descriptor set layout
+    vk::PipelineLayoutCreateInfo plInfo{};
+    plInfo.setSetLayouts(descriptorSetLayout);
+    pipelineLayout = device.createPipelineLayout(plInfo);
 
-    // Формат данных вершин, которые будут переданы в вершинный шейдер
-    // 
-    // ПУСТО
-    // 
-    // vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
-    // vertexInputStateCreateInfo.setVertexBindingDescriptionCount(1);
-    // vertexInputStateCreateInfo.setPVertexBindingDescriptions(&bindingDescription);
-    // vertexInputStateCreateInfo.setVertexAttributeDescriptionCount(static_cast<uint32_t>(attributeDescriptions.size()));
-    // vertexInputStateCreateInfo.setPVertexAttributeDescriptions(attributeDescriptions.data());
+    // 5) Descriptor pool & set
+    vk::DescriptorPoolSize poolSize{};
+    poolSize.setType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1);
+    vk::DescriptorPoolCreateInfo dpInfo{};
+    dpInfo.setPoolSizes(poolSize)
+            .setMaxSets(1);
+    descriptorPool = device.createDescriptorPool(dpInfo);
 
-    vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
-    vertexInputStateCreateInfo.setVertexBindingDescriptions({});// Пусто
-    vertexInputStateCreateInfo.setVertexAttributeDescriptions({});// Пусто
+    vk::DescriptorSetAllocateInfo dsAlloc{};
+    dsAlloc.setDescriptorPool(descriptorPool)
+            .setSetLayouts(descriptorSetLayout);
+    descriptorSet = device.allocateDescriptorSets(dsAlloc)[0];
 
-    // Параметры сборки входных данных конвеера
-    vk::PipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo{};
-    inputAssemblyStateCreateInfo.setTopology(vk::PrimitiveTopology::eTriangleList);
+    vk::DescriptorBufferInfo bufDesc{};
+    bufDesc.setBuffer(uniformBuffer)
+            .setOffset(0)
+            .setRange(sizeof(UBO));
+    vk::WriteDescriptorSet writeDS{};
+    writeDS.setDstSet(descriptorSet)
+            .setDstBinding(0)
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setBufferInfo(bufDesc);
+    device.updateDescriptorSets(writeDS, {});
 
-    // Область просмотра
-    // Область буфера кадра, в которую будет визуализироваться вывод
+    // 6) Rest of pipeline setup
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.setVertexBindingDescriptions({})
+            .setVertexAttributeDescriptions({});
+
+    vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleStrip);
+
     vk::Viewport viewport{};
+    viewport.setX(0.0f)
+            .setY(0.0f)
+            .setWidth(float(swapchain.getExtent().width))
+            .setHeight(float(swapchain.getExtent().height))
+            .setMinDepth(0.0f)
+            .setMaxDepth(1.0f);
 
-    // положение в пикселях
-    viewport.setX(0.0f);
-    viewport.setY(0.0f);
+    vk::Rect2D scissor{};
+    scissor.setOffset({0, 0});
+    scissor.setExtent(swapchain.getExtent());
 
-    // размеры области
-    viewport.setWidth(static_cast<float>(swapchain.getExtent().width));
-    viewport.setHeight(static_cast<float>(swapchain.getExtent().height));
+    vk::PipelineViewportStateCreateInfo viewportState{};
+    viewportState.setViewportCount(1)
+            .setPViewports(&viewport)
+            .setScissorCount(1)
+            .setPScissors(&scissor);
 
-    // диапазон глубины
-    viewport.setMinDepth(0.0f);
-    viewport.setMaxDepth(1.0f);
+    vk::PipelineRasterizationStateCreateInfo rasterization{};
+    rasterization.setLineWidth(1.0f);
 
-    // Ножницы (scissors) определяют прямоугольную область, в которой фактически будут храниться пиксели
-    vk::Rect2D scissors{};
-    scissors.setOffset(vk::Offset2D{0, 0});
-    scissors.setExtent(swapchain.getExtent());
+    vk::PipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.setMinSampleShading(1.0f);
 
-    // Состояние области просмотра
-    vk::PipelineViewportStateCreateInfo viewportStateCreateInfo{};
-
-    // Указание области просмотра (viewport)
-    viewportStateCreateInfo.setViewportCount(1);
-    viewportStateCreateInfo.setPViewports(&viewport);
-
-    // Указание ножниц (scissor)
-    viewportStateCreateInfo.setScissorCount(1);
-    viewportStateCreateInfo.setPScissors(&scissors);
-
-    // Растеризатор
-    // Используются значения по умолчанию
-    vk::PipelineRasterizationStateCreateInfo rasterizationStateCreateInfo{};
-    rasterizationStateCreateInfo.setLineWidth(1.0f);
-
-    // Дефолтный мультисемплер
-    vk::PipelineMultisampleStateCreateInfo multisampleStateCreateInfo{};
-    multisampleStateCreateInfo.setMinSampleShading(1.0f);
-
-    // Настройка смешивания цветов
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
-    colorBlendAttachment.setBlendEnable(vk::False);
+    colorBlendAttachment.setColorWriteMask(
+                                vk::ColorComponentFlagBits::eR |
+                                vk::ColorComponentFlagBits::eG |
+                                vk::ColorComponentFlagBits::eB |
+                                vk::ColorComponentFlagBits::eA)
+            .setBlendEnable(VK_FALSE);
 
     vk::PipelineColorBlendStateCreateInfo colorBlending{};
-    colorBlending.setLogicOpEnable(vk::False);
-    colorBlending.setLogicOp(vk::LogicOp::eCopy);
-    colorBlending.setAttachmentCount(1);
-    colorBlending.setPAttachments(&colorBlendAttachment);
+    colorBlending.setLogicOpEnable(VK_FALSE)
+            .setLogicOp(vk::LogicOp::eCopy)
+            .setAttachmentCount(1)
+            .setPAttachments(&colorBlendAttachment);
 
-    // Создание макета конвейера (Pipeline Layout)
-    vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.setSetLayouts(nullptr);
-    pipelineLayoutInfo.setPushConstantRanges(nullptr);
-
-    // Настройка глубины
     vk::PipelineDepthStencilStateCreateInfo depthStencil{};
-    depthStencil.setDepthTestEnable(VK_TRUE);
-    depthStencil.setDepthWriteEnable(VK_TRUE);
-    depthStencil.setDepthCompareOp(vk::CompareOp::eLess);
-    depthStencil.setDepthBoundsTestEnable(VK_FALSE);
-    depthStencil.setStencilTestEnable(VK_FALSE);
-    depthStencil.setMinDepthBounds(0.0f);// опционально
-    depthStencil.setMaxDepthBounds(1.0f);// опционально
+    depthStencil.setDepthTestEnable(VK_TRUE)
+            .setDepthWriteEnable(VK_TRUE)
+            .setDepthCompareOp(vk::CompareOp::eLess)
+            .setDepthBoundsTestEnable(VK_FALSE)
+            .setStencilTestEnable(VK_FALSE);
 
-    try {
-        pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
-    } catch (const std::exception &ex) {
-        std::cerr << "Failed to create pipeline layout: " << ex.what() << std::endl;
-    }
-
-    // Настройка структуры графического конвейера
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.setStages(shaderStages);
-    pipelineInfo.setPVertexInputState(&vertexInputStateCreateInfo);
-    pipelineInfo.setPInputAssemblyState(&inputAssemblyStateCreateInfo);
-    pipelineInfo.setPViewportState(&viewportStateCreateInfo);
-    pipelineInfo.setPRasterizationState(&rasterizationStateCreateInfo);
-    pipelineInfo.setPMultisampleState(&multisampleStateCreateInfo);
-    pipelineInfo.setPColorBlendState(&colorBlending);
-    pipelineInfo.setLayout(pipelineLayout);
-    pipelineInfo.setRenderPass(renderPass);
-    pipelineInfo.setSubpass(0);
-    pipelineInfo.setPDepthStencilState(&depthStencil);
+    pipelineInfo.setStages(shaderStages)
+            .setPVertexInputState(&vertexInputInfo)
+            .setPInputAssemblyState(&inputAssembly)
+            .setPViewportState(&viewportState)
+            .setPRasterizationState(&rasterization)
+            .setPMultisampleState(&multisampling)
+            .setPColorBlendState(&colorBlending)
+            .setPDepthStencilState(&depthStencil)
+            .setLayout(pipelineLayout)
+            .setRenderPass(renderPass)
+            .setSubpass(0);
 
-    try {
-        pipeline = device.createGraphicsPipeline(nullptr, pipelineInfo).value;
-    } catch (const std::exception &ex) {
-        std::cerr << "Failed to create pipeline: " << ex.what() << std::endl;
-    }
+    pipeline = device.createGraphicsPipeline(nullptr, pipelineInfo).value;
 }
 
 void ff::Pipeline::destroy(const vk::Device &device) const {
     if (pipeline) device.destroyPipeline(pipeline);
     if (pipelineLayout) device.destroyPipelineLayout(pipelineLayout);
+    if (descriptorPool) device.destroyDescriptorPool(descriptorPool);
+    if (descriptorSetLayout) device.destroyDescriptorSetLayout(descriptorSetLayout);
+    if (uniformBuffer) device.destroyBuffer(uniformBuffer);
+    if (uniformMemory) device.freeMemory(uniformMemory);
     if (vertexShaderModule) device.destroyShaderModule(vertexShaderModule);
     if (fragmentShaderModule) device.destroyShaderModule(fragmentShaderModule);
 }
 
-vk::Pipeline ff::Pipeline::get() const {
-    return pipeline;
+vk::Pipeline ff::Pipeline::get() const { return pipeline; }
+
+void ff::Pipeline::updateUniform(const vk::Device &device, float time) {
+    struct UBO {
+        float uTime;
+    } ubo;
+    ubo.uTime = time;
+
+    void *data = device.mapMemory(uniformMemory, 0, sizeof(ubo));
+    memcpy(data, &ubo, sizeof(ubo));
+    device.unmapMemory(uniformMemory);
 }
 
-vk::ShaderModule ff::Pipeline::createShaderModule(const vk::Device &device, const std::vector<uint32_t> &shaderBianary) const {
-    vk::ShaderModuleCreateInfo createInfo{};
-    createInfo.setCodeSize(shaderBianary.size() * sizeof(uint32_t));
-    createInfo.setPCode(reinterpret_cast<const uint32_t *>(shaderBianary.data()));
+vk::PipelineLayout ff::Pipeline::getPipelineLayout() const {
+    return pipelineLayout;
+}
 
-    try {
-        return device.createShaderModule(createInfo);
-    } catch (std::exception &ex) {
-        std::cout << "Failed to create shader module: " << ex.what() << std::endl;
-    }
+vk::DescriptorSet ff::Pipeline::getDescriptorSet() const {
+    return descriptorSet;
+}
+
+vk::ShaderModule ff::Pipeline::createShaderModule(
+        const vk::Device &device,
+        const std::vector<uint32_t> &shaderBinary) const {
+    vk::ShaderModuleCreateInfo createInfo{};
+    createInfo.setCodeSize(shaderBinary.size() * sizeof(uint32_t))
+            .setPCode(shaderBinary.data());
+    return device.createShaderModule(createInfo);
 }

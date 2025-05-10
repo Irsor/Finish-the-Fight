@@ -27,6 +27,8 @@ namespace ff {
 
         static PhysicalDevice selectPhysicalDevice(const vk::Instance &instance);
 
+        uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
+
     private:
         vk::PhysicalDevice device{};
         vk::PhysicalDeviceProperties deviceProperties{};
