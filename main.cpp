@@ -6,7 +6,7 @@
 #include "Window.hpp"
 
 int main() {
-    ff::Window window{"Finish the Fight"};
+    ff::Window window{"Finish the Fight", 800, 800};
     ff::App app{window};
 
     while (!glfwWindowShouldClose(window.get())) {
