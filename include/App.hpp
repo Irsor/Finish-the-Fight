@@ -13,6 +13,8 @@
 #include "Window.hpp"
 #include "Swapchain.hpp"
 #include "Pipeline.hpp"
+#include "AccumulationResources.hpp"
+
 
 namespace ff {
     class App {
@@ -23,65 +25,46 @@ namespace ff {
         void drawFrame();
 
     private:
-
-        // Создание инстанса
         void createInstance();
-        const std::vector<const char*> getExtensions() const;
+        const std::vector<const char *> getExtensions() const;
 
-        // Создание логического устройства
-        void createDevice();
-
-        // Создание очередей
-        void createQueues();
-
-        // Создание поверхности
         void createSurface(const Window &window);
-
-        // Создание представлений изображений и удаление
+        void createDevice();
         void createImageViews();
         void destroyImageViews() const;
-        vk::Format findSupportedDepthFormat();
-
-        // Создание прохода рендера
         void createRenderPass();
-
-        // Создание фреймбуфферов
-        void createFrameBuffers();
+        void createFramebuffers();
         void destroyFramebuffers() const;
-
-        // Создание пула команд
         void createCommandPool();
-
-        // Создание буфера команд
         void allocateCommandBuffers();
-
-        // Запись данных в буфер команд
         void writeDataIntoCommandBuffers(uint32_t imageIndex);
-
-        // Семафоры и fence
         void createSyncObjects();
 
-        vk::Instance instance{};
-        ff::PhysicalDevice physicalDevice{};
-        vk::Device device{};
-        vk::SurfaceKHR surface{};
-        ff::Swapchain swapchain{};
-        std::vector<vk::ImageView> imageViews{};
-        ff::Pipeline pipeline{};
-        vk::RenderPass renderPass{};
-        std::vector<vk::Framebuffer> framebuffers{};
-        vk::CommandPool commandPool{};
-        std::vector<vk::CommandBuffer> commandBuffers{};
+        vk::Format findSupportedDepthFormat();
 
-        // ---
-        // Очереди
-        vk::Queue graphicsQueue{};
-        vk::Queue presentQueue{};
-        // ---
+        vk::Instance instance;
+        ff::PhysicalDevice physicalDevice;
+        vk::Device device;
+        vk::SurfaceKHR surface;
 
-        // Объекты синхронизации
-        vk::Semaphore imageAvailableSemaphore{};
-        vk::Semaphore renderFinishedSemaphore{};
-        vk::Fence inFlightFense{};
+        ff::Swapchain swapchain;
+        std::vector<vk::ImageView> imageViews;
+        ff::Pipeline pipeline;
+        ff::AccumulationResources accumulation;
+
+        vk::RenderPass renderPass;
+        std::vector<vk::Framebuffer> framebuffers;
+
+        vk::CommandPool commandPool;
+        std::vector<vk::CommandBuffer> commandBuffers;
+
+        vk::Queue graphicsQueue;
+        vk::Queue presentQueue;
+
+        vk::Semaphore imageAvailableSemaphore;
+        vk::Semaphore renderFinishedSemaphore;
+        vk::Fence inFlightFence;
+
+        uint32_t frameCounter = 0;
     };
-}
+}// namespace ff

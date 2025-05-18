@@ -1,80 +1,85 @@
 #include "Pipeline.hpp"
 
-ff::Pipeline::Pipeline() {
-}
+ff::Pipeline::Pipeline() {}
+ff::Pipeline::~Pipeline() {}
 
-ff::Pipeline::~Pipeline() {
-}
+void ff::Pipeline::init(const vk::Device &device,
+                        const ff::Swapchain &swapchain,
+                        const vk::RenderPass &renderPass,
+                        const std::string &vertexShaderPath,
+                        const std::string &fragmentShaderPath,
+                        const ff::PhysicalDevice &physicalDevice,
+                        const vk::ImageView &accumImageView) {
 
-void ff::Pipeline::init(
-        const vk::Device &device,
-        const ff::Swapchain &swapchain,
-        const vk::RenderPass &renderPass,
-        const std::string &vertexShaderPath,
-        const std::string &fragmentShaderPath,
-        const ff::PhysicalDevice &physicalDevice) {
-    // 1) Загрузка шейдеров
     auto vertCode = ff::utils::readFile(vertexShaderPath);
     auto fragCode = ff::utils::readFile(fragmentShaderPath);
-    vertexShaderModule   = createShaderModule(device, vertCode);
+
+    vertexShaderModule = createShaderModule(device, vertCode);
     fragmentShaderModule = createShaderModule(device, fragCode);
 
     vk::PipelineShaderStageCreateInfo vertStage{};
     vertStage.setStage(vk::ShaderStageFlagBits::eVertex)
-             .setModule(vertexShaderModule)
-             .setPName("main");
+            .setModule(vertexShaderModule)
+            .setPName("main");
+
     vk::PipelineShaderStageCreateInfo fragStage{};
     fragStage.setStage(vk::ShaderStageFlagBits::eFragment)
-             .setModule(fragmentShaderModule)
-             .setPName("main");
-    std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {{ vertStage, fragStage }};
+            .setModule(fragmentShaderModule)
+            .setPName("main");
 
-    // 2) Создание UBO-буфера под std140 binding=0
+    std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {vertStage, fragStage};
+
     struct alignas(16) UBO {
         float uResolution[2];
-        float _padding1[2];  // выравнивание vec2 до 16 байт
+        float _pad1[2];
         float uTime;
-        float _padding2[3];  // выравнивание всей структуры до 16 байт
+        int uSampleCount;
+        float _pad2[2];
     };
 
     vk::BufferCreateInfo bufInfo{};
     bufInfo.setSize(sizeof(UBO))
-           .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
-           .setSharingMode(vk::SharingMode::eExclusive);
-    uniformBuffer = device.createBuffer(bufInfo);
+            .setUsage(vk::BufferUsageFlagBits::eUniformBuffer)
+            .setSharingMode(vk::SharingMode::eExclusive);
 
+    uniformBuffer = device.createBuffer(bufInfo);
     auto memReq = device.getBufferMemoryRequirements(uniformBuffer);
-    uint32_t memType = physicalDevice.findMemoryType(
-        memReq.memoryTypeBits,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
-    );
+    uint32_t memType = physicalDevice.findMemoryType(memReq.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
     vk::MemoryAllocateInfo allocInfo{};
     allocInfo.setAllocationSize(memReq.size)
-             .setMemoryTypeIndex(memType);
+            .setMemoryTypeIndex(memType);
+
     uniformMemory = device.allocateMemory(allocInfo);
     device.bindBufferMemory(uniformBuffer, uniformMemory, 0);
 
-    // 3) DescriptorSetLayout
     vk::DescriptorSetLayoutBinding uboBinding{};
     uboBinding.setBinding(0)
-              .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-              .setDescriptorCount(1)
-              .setStageFlags(vk::ShaderStageFlagBits::eFragment);
+            .setDescriptorType(vk::DescriptorType::eUniformBuffer)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eFragment);
+
+    vk::DescriptorSetLayoutBinding storageImageBinding{};
+    storageImageBinding.setBinding(1)
+            .setDescriptorType(vk::DescriptorType::eStorageImage)
+            .setDescriptorCount(1)
+            .setStageFlags(vk::ShaderStageFlagBits::eFragment);
+
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {uboBinding, storageImageBinding};
     vk::DescriptorSetLayoutCreateInfo dslInfo{};
-    dslInfo.setBindings(uboBinding);
+    dslInfo.setBindings(bindings);
     descriptorSetLayout = device.createDescriptorSetLayout(dslInfo);
 
-    // 4) Pipeline layout with descriptor set layout
     vk::PipelineLayoutCreateInfo plInfo{};
     plInfo.setSetLayouts(descriptorSetLayout);
     pipelineLayout = device.createPipelineLayout(plInfo);
 
-    // 5) Descriptor pool & set
-    vk::DescriptorPoolSize poolSize{};
-    poolSize.setType(vk::DescriptorType::eUniformBuffer)
-            .setDescriptorCount(1);
+    vk::DescriptorPoolSize poolSize1{vk::DescriptorType::eUniformBuffer, 1};
+    vk::DescriptorPoolSize poolSize2{vk::DescriptorType::eStorageImage, 1};
+    std::array<vk::DescriptorPoolSize, 2> poolSizes = {poolSize1, poolSize2};
+
     vk::DescriptorPoolCreateInfo dpInfo{};
-    dpInfo.setPoolSizes(poolSize)
+    dpInfo.setPoolSizes(poolSizes)
             .setMaxSets(1);
     descriptorPool = device.createDescriptorPool(dpInfo);
 
@@ -83,79 +88,60 @@ void ff::Pipeline::init(
             .setSetLayouts(descriptorSetLayout);
     descriptorSet = device.allocateDescriptorSets(dsAlloc)[0];
 
-    vk::DescriptorBufferInfo bufDesc{};
-    bufDesc.setBuffer(uniformBuffer)
-            .setOffset(0)
-            .setRange(sizeof(UBO));
-    vk::WriteDescriptorSet writeDS{};
-    writeDS.setDstSet(descriptorSet)
+    vk::DescriptorBufferInfo uboDesc{};
+    uboDesc.setBuffer(uniformBuffer).setOffset(0).setRange(sizeof(UBO));
+
+    vk::WriteDescriptorSet writeUBO{};
+    writeUBO.setDstSet(descriptorSet)
             .setDstBinding(0)
             .setDescriptorType(vk::DescriptorType::eUniformBuffer)
-            .setBufferInfo(bufDesc);
-    device.updateDescriptorSets(writeDS, {});
+            .setBufferInfo(uboDesc);
 
-    // 6) Rest of pipeline setup
-    vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.setVertexBindingDescriptions({})
-            .setVertexAttributeDescriptions({});
+    vk::DescriptorImageInfo imageInfo{};
+    imageInfo.setImageView(accumImageView)
+            .setImageLayout(vk::ImageLayout::eGeneral);
 
+    vk::WriteDescriptorSet writeImage{};
+    writeImage.setDstSet(descriptorSet)
+            .setDstBinding(1)
+            .setDescriptorType(vk::DescriptorType::eStorageImage)
+            .setImageInfo(imageInfo);
+
+    device.updateDescriptorSets({writeUBO, writeImage}, {});
+
+    vk::PipelineVertexInputStateCreateInfo vertexInput{};
     vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleStrip);
+    inputAssembly.setTopology(vk::PrimitiveTopology::eTriangleList);
 
-    vk::Viewport viewport{};
-    viewport.setX(0.0f)
-            .setY(0.0f)
-            .setWidth(float(swapchain.getExtent().width))
-            .setHeight(float(swapchain.getExtent().height))
-            .setMinDepth(0.0f)
-            .setMaxDepth(1.0f);
-
-    vk::Rect2D scissor{};
-    scissor.setOffset({0, 0});
-    scissor.setExtent(swapchain.getExtent());
-
+    vk::Viewport viewport{0, 0, float(swapchain.getExtent().width), float(swapchain.getExtent().height), 0, 1};
+    vk::Rect2D scissor{{0, 0}, swapchain.getExtent()};
     vk::PipelineViewportStateCreateInfo viewportState{};
-    viewportState.setViewportCount(1)
-            .setPViewports(&viewport)
-            .setScissorCount(1)
-            .setPScissors(&scissor);
+    viewportState.setViewports(viewport).setScissors(scissor);
 
-    vk::PipelineRasterizationStateCreateInfo rasterization{};
-    rasterization.setLineWidth(1.0f);
+    vk::PipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.setLineWidth(1.0f);
 
     vk::PipelineMultisampleStateCreateInfo multisampling{};
-    multisampling.setMinSampleShading(1.0f);
+    multisampling.setRasterizationSamples(vk::SampleCountFlagBits::e1);
 
-    vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.setColorWriteMask(
-                                vk::ColorComponentFlagBits::eR |
-                                vk::ColorComponentFlagBits::eG |
-                                vk::ColorComponentFlagBits::eB |
-                                vk::ColorComponentFlagBits::eA)
-            .setBlendEnable(VK_FALSE);
+    vk::PipelineColorBlendAttachmentState blendAttachment{};
+    blendAttachment.setColorWriteMask(
+            vk::ColorComponentFlagBits::eR |
+            vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA);
 
     vk::PipelineColorBlendStateCreateInfo colorBlending{};
-    colorBlending.setLogicOpEnable(VK_FALSE)
-            .setLogicOp(vk::LogicOp::eCopy)
-            .setAttachmentCount(1)
-            .setPAttachments(&colorBlendAttachment);
-
-    vk::PipelineDepthStencilStateCreateInfo depthStencil{};
-    depthStencil.setDepthTestEnable(VK_TRUE)
-            .setDepthWriteEnable(VK_TRUE)
-            .setDepthCompareOp(vk::CompareOp::eLess)
-            .setDepthBoundsTestEnable(VK_FALSE)
-            .setStencilTestEnable(VK_FALSE);
+    colorBlending.setAttachments(blendAttachment);
 
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.setStages(shaderStages)
-            .setPVertexInputState(&vertexInputInfo)
+            .setPVertexInputState(&vertexInput)
             .setPInputAssemblyState(&inputAssembly)
             .setPViewportState(&viewportState)
-            .setPRasterizationState(&rasterization)
+            .setPRasterizationState(&rasterizer)
             .setPMultisampleState(&multisampling)
             .setPColorBlendState(&colorBlending)
-            .setPDepthStencilState(&depthStencil)
             .setLayout(pipelineLayout)
             .setRenderPass(renderPass)
             .setSubpass(0);
@@ -176,21 +162,19 @@ void ff::Pipeline::destroy(const vk::Device &device) const {
 
 vk::Pipeline ff::Pipeline::get() const { return pipeline; }
 
-// Обновление UBO перед отрисовкой void 
-void ff::Pipeline::updateUniform(
-          const vk::Device &device,
-          const vk::Extent2D &resolution,
-          float time) {
+void ff::Pipeline::updateUniform(const vk::Device &device, const vk::Extent2D &resolution, float time, int sampleCount) {
     struct UBO {
         float uResolution[2];
-        float _padding1[2];
+        float _pad1[2];
         float uTime;
-        float _padding2[3];
+        int uSampleCount;
+        float _pad2[2];
     } ubo{};
 
     ubo.uResolution[0] = static_cast<float>(resolution.width);
     ubo.uResolution[1] = static_cast<float>(resolution.height);
     ubo.uTime = time;
+    ubo.uSampleCount = sampleCount;
 
     void *data = device.mapMemory(uniformMemory, 0, sizeof(UBO));
     memcpy(data, &ubo, sizeof(UBO));
@@ -205,9 +189,7 @@ vk::DescriptorSet ff::Pipeline::getDescriptorSet() const {
     return descriptorSet;
 }
 
-vk::ShaderModule ff::Pipeline::createShaderModule(
-        const vk::Device &device,
-        const std::vector<uint32_t> &shaderBinary) const {
+vk::ShaderModule ff::Pipeline::createShaderModule(const vk::Device &device, const std::vector<uint32_t> &shaderBinary) const {
     vk::ShaderModuleCreateInfo createInfo{};
     createInfo.setCodeSize(shaderBinary.size() * sizeof(uint32_t))
             .setPCode(shaderBinary.data());

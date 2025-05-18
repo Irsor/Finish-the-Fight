@@ -6,14 +6,28 @@ ff::App::App(const Window &window) {
     physicalDevice = ff::PhysicalDevice::selectPhysicalDevice(instance);
     createDevice();
     swapchain.init(instance, physicalDevice, device, surface, window);
+
+    // Инициализируем накопительное изображение (storage image)
+    accumulation.create(device, physicalDevice, swapchain.getExtent());
+
     createImageViews();
     createRenderPass();
-    pipeline.init(device, swapchain, renderPass, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv", physicalDevice);
-    createFrameBuffers();
+
+    pipeline.init(
+            device,
+            swapchain,
+            renderPass,
+            "D:\\Sources\\Pure\\shaders\\vert.spv",
+            "D:\\Sources\\Pure\\shaders\\frag.spv",
+            physicalDevice,
+            accumulation.getImageView());
+
+    createFramebuffers();
     createCommandPool();
     allocateCommandBuffers();
     createSyncObjects();
 }
+
 
 ff::App::~App() {
     device.waitIdle();
@@ -24,7 +38,7 @@ ff::App::~App() {
     device.destroyRenderPass(renderPass);
     device.destroySemaphore(imageAvailableSemaphore);
     device.destroySemaphore(renderFinishedSemaphore);
-    device.destroyFence(inFlightFense);
+    device.destroyFence(inFlightFence);
     device.freeCommandBuffers(commandPool, commandBuffers);    
     device.destroyCommandPool(commandPool);
     device.destroy();
@@ -111,6 +125,7 @@ void ff::App::createDevice() {
     vk::PhysicalDeviceFeatures features{};
     features.geometryShader = vk::True;
     features.tessellationShader = vk::True;
+    features.setFragmentStoresAndAtomics(vk::True);
 
     vk::DeviceCreateInfo deviceCreateInfo{};
     deviceCreateInfo.setQueueCreateInfoCount(static_cast<uint32_t>(deviceQueueCreateInfo.size()));
@@ -126,10 +141,6 @@ void ff::App::createDevice() {
     } catch (const std::exception &ex) {
         std::cerr << "Failed to create Device: " << ex.what() << std::endl;
     }
-}
-
-void ff::App::createQueues() {
-    //graphicsQueue = device.getQueue(physicalDevice.selectGraphicsQueueFamilyIndex(), 0);
 }
 
 void ff::App::createSurface(const Window &window) {
@@ -269,8 +280,8 @@ void ff::App::createRenderPass() {
     }
 }
 
-void ff::App::createFrameBuffers() {
-    for (const auto& imageView : imageViews) {
+void ff::App::createFramebuffers() {
+    for (const auto &imageView: imageViews) {
         vk::FramebufferCreateInfo frameBufferCreateInfo{};
         frameBufferCreateInfo.setRenderPass(renderPass);
         frameBufferCreateInfo.setAttachmentCount(1);
@@ -322,44 +333,63 @@ void ff::App::allocateCommandBuffers() {
 
 // Полная реализация writeDataIntoCommandBuffers с привязкой дескриптор-сета:
 void ff::App::writeDataIntoCommandBuffers(uint32_t imageIndex) {
-    // 1) Сброс и начало записи командного буфера для конкретного изображения
-    commandBuffers[imageIndex].reset({});
+    vk::CommandBuffer cmd = commandBuffers[imageIndex];
+    cmd.reset();
+
     vk::CommandBufferBeginInfo beginInfo{};
     beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-    commandBuffers[imageIndex].begin(beginInfo);
+    cmd.begin(beginInfo);
 
-    // 2) Подготовка области рендеринга и ClearColor
-    vk::Rect2D renderArea{{0, 0}, swapchain.getExtent()};
-    vk::ClearValue clearColor;
-    clearColor.setColor(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f});
+    // Переход storage image в GENERAL и первичное очищение на первом кадре
+    vk::ImageMemoryBarrier barrier{};
+    vk::ImageLayout oldLayout = (frameCounter == 0 ? vk::ImageLayout::eUndefined : vk::ImageLayout::eGeneral);
+    barrier.setOldLayout(oldLayout);
+    barrier.setNewLayout(vk::ImageLayout::eGeneral);
+    barrier.setImage(accumulation.getImage());
+    barrier.setSubresourceRange({vk::ImageAspectFlagBits::eColor,
+                                 0, 1, 0, 1});
+    // Перед переходом для frameCounter>0 ждём завершения записей фрагментного шейдера
+    barrier.setSrcAccessMask(frameCounter == 0 ? vk::AccessFlagBits() : vk::AccessFlagBits::eShaderWrite);
+    // После перехода даём право на очистку (transfer) и чтение-запись шейдером
+    barrier.setDstAccessMask(vk::AccessFlagBits::eTransferWrite | vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite);
 
+    cmd.pipelineBarrier(
+            frameCounter == 0 ? vk::PipelineStageFlagBits::eTopOfPipe : vk::PipelineStageFlagBits::eFragmentShader,
+            vk::PipelineStageFlagBits::eTransfer | vk::PipelineStageFlagBits::eFragmentShader,
+            {}, nullptr, nullptr, barrier);
+
+    // Если первый кадр — очищаем accumImage нулями
+    if (frameCounter == 0) {
+        vk::ClearColorValue zeroClear{std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}};
+        cmd.clearColorImage(
+                accumulation.getImage(),
+                vk::ImageLayout::eGeneral,
+                zeroClear,
+                vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+    }
+
+    // Отрисовка fullscreen треугольника
+    vk::ClearValue clearValue = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f});
     vk::RenderPassBeginInfo rpInfo{};
-    rpInfo.setRenderPass(renderPass)
-            .setFramebuffer(framebuffers[imageIndex])
-            .setRenderArea(renderArea)
-            .setClearValueCount(1)
-            .setClearValues({clearColor});
+    rpInfo.setRenderPass(renderPass);
+    rpInfo.setFramebuffer(framebuffers[imageIndex]);
+    rpInfo.setRenderArea({{0, 0}, swapchain.getExtent()});
+    rpInfo.setClearValueCount(1);
+    rpInfo.setPClearValues(&clearValue);
 
-    // 3) Начало рендер-пасса
-    commandBuffers[imageIndex].beginRenderPass(rpInfo, vk::SubpassContents::eInline);
-
-    // 4) Биндим пайплайн и дескриптор-сет
-    commandBuffers[imageIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.get());
-    commandBuffers[imageIndex].bindDescriptorSets(
+    cmd.beginRenderPass(rpInfo, vk::SubpassContents::eInline);
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.get());
+    cmd.bindDescriptorSets(
             vk::PipelineBindPoint::eGraphics,
-            pipeline.getPipelineLayout(),// из добавленного геттера
-            0,                           // set = 0
-            pipeline.getDescriptorSet(), // из добавленного геттера
-            nullptr);
+            pipeline.getPipelineLayout(),
+            0,
+            pipeline.getDescriptorSet(),
+            {});
+    cmd.draw(3, 1, 0, 0);
+    cmd.endRenderPass();
 
-    // 5) Рисуем full-screen quad (4 вершины)
-    commandBuffers[imageIndex].draw(6, 1, 0, 0);
-
-    // 6) Завершаем рендер-пасс и запись команд
-    commandBuffers[imageIndex].endRenderPass();
-    commandBuffers[imageIndex].end();
+    cmd.end();
 }
-
 
 void ff::App::createSyncObjects() {
     vk::SemaphoreCreateInfo semaphoreCreateInfo{};
@@ -369,15 +399,15 @@ void ff::App::createSyncObjects() {
     try {
         imageAvailableSemaphore = device.createSemaphore(semaphoreCreateInfo);
         renderFinishedSemaphore = device.createSemaphore(semaphoreCreateInfo);
-        inFlightFense = device.createFence(fenseCreateInfo);
+        inFlightFence = device.createFence(fenseCreateInfo);
     } catch (const std::exception &ex) {
         std::cerr << "Failed to craete sync objects: " << ex.what() << std::endl;
     }
 }
 
 void ff::App::drawFrame() {
-    device.waitForFences({inFlightFense}, vk::True, UINT64_MAX);
-    device.resetFences(inFlightFense);
+    device.waitForFences({inFlightFence}, vk::True, UINT64_MAX);
+    device.resetFences(inFlightFence);
 
     vk::AcquireNextImageInfoKHR imageInfo{};
     imageInfo.setSwapchain(swapchain.get());
@@ -390,12 +420,14 @@ void ff::App::drawFrame() {
     if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
         throw std::runtime_error("Не удалось получить изображение из swapchain.");
 
-    // Обновление uTime
-    float timeSeconds = static_cast<float>(std::chrono::duration<double>(
-                                                   std::chrono::high_resolution_clock::now().time_since_epoch())
-                                                   .count());
+    // Время (секунды) для uTime
+    float timeSeconds = static_cast<float>(
+            std::chrono::duration<double>(
+                    std::chrono::high_resolution_clock::now().time_since_epoch())
+                    .count());
 
-    pipeline.updateUniform(device, swapchain.getExtent(), timeSeconds);
+    // Обновляем UniformBuffer с временем и счётчиком семплов
+    pipeline.updateUniform(device, swapchain.getExtent(), timeSeconds, frameCounter);
 
     commandBuffers[imageIndex].reset();
     writeDataIntoCommandBuffers(imageIndex);
@@ -408,7 +440,7 @@ void ff::App::drawFrame() {
     submitInfo.setCommandBuffers(commandBuffers[imageIndex]);
     submitInfo.setSignalSemaphores(renderFinishedSemaphore);
 
-    graphicsQueue.submit(submitInfo, inFlightFense);
+    graphicsQueue.submit(submitInfo, inFlightFence);
 
     vk::PresentInfoKHR presentInfo{};
     presentInfo.setWaitSemaphores(renderFinishedSemaphore);
@@ -419,4 +451,7 @@ void ff::App::drawFrame() {
     vk::Result presentResult = presentQueue.presentKHR(&presentInfo);
     if (presentResult != vk::Result::eSuccess && presentResult != vk::Result::eSuboptimalKHR)
         throw std::runtime_error("Не удалось представить изображение.");
+
+    // Увеличиваем счётчик семплов
+    frameCounter++;
 }

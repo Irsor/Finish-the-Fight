@@ -1,18 +1,21 @@
 #version 460
-#define  FAR_DISTANCE 1000000.0f;
+#define  FAR_DISTANCE 1000000.0
 #define  MAX_DEPTH    8
 #define  PI           3.1415926535
 #define  N_IN         0.99
 #define  N_OUT        1.0
 
+layout(location = 0) out vec4 FragColor;
+
 layout(std140, binding = 0) uniform UBO {
     vec2 uResolution;
-    vec2 _pad1;
+    vec2 _pad;
     float uTime;
-    vec3 _pad2;
+    float uSampleCount;
 };
 
-layout(location = 0) out vec4 FragColor;
+layout(binding = 1, rgba32f) uniform image2D accumImage;
+
 
 struct Material {
     vec3 emmitance;
@@ -231,8 +234,8 @@ bool IsRefracted(float rand, vec3 direction, vec3 normal, float opacity, float n
 }
 
 vec3 TracePath(vec3 rayOrigin, vec3 rayDirection) {
-    vec3 light = vec3(0.0f);    // Суммарное количество света
-    vec3 reflection = vec3(1.0f);  // Коэффициент отражения
+    vec3 light = vec3(0.0f);
+    vec3 reflection = vec3(1.0f);
 
     for (int i = 0; i < MAX_DEPTH; i++) {
         float fraction;
@@ -241,18 +244,15 @@ vec3 TracePath(vec3 rayOrigin, vec3 rayDirection) {
         bool hit = CastRay(rayOrigin, rayDirection, fraction, normal, material);
         if (hit) {
             vec3 newRayOrigin = rayOrigin + fraction * rayDirection;
-
-            // Добавим шум, зависящий от пикселя и времени
             vec2 randSeed = gl_FragCoord.xy + uTime * 10.0;
             vec2 rand = vec2(RandomNoise(randSeed), RandomNoise(randSeed + 100.0));
             vec3 hemisphereDistributedDirection = NormalOrientedHemispherePoint(rand, normal);
 
-            vec3 randomVec = vec3(
+            vec3 randomVec = normalize(2.0 * vec3(
                 RandomNoise(randSeed + 1.0),
                 RandomNoise(randSeed + 2.0),
                 RandomNoise(randSeed + 3.0)
-            );
-            randomVec = normalize(2.0 * randomVec - 1.0);
+            ) - 1.0);
 
             vec3 tangent = cross(randomVec, normal);
             vec3 bitangent = cross(normal, tangent);
@@ -260,16 +260,12 @@ vec3 TracePath(vec3 rayOrigin, vec3 rayDirection) {
 
             vec3 newRayDirection = transform * hemisphereDistributedDirection;
 
-            // проверяем, преломится ли луч. Если да, то меняем логику расчета итогового направления
             bool refracted = IsRefracted(RandomNoise(randSeed + 1.0).x, rayDirection, normal, material.opacity, N_IN, N_OUT);
-            if (refracted)
-            {
+            if (refracted) {
                 vec3 idealRefraction = IdealRefract(rayDirection, normal, N_IN, N_OUT);
                 newRayDirection = normalize(mix(-newRayDirection, idealRefraction, material.roughness));
                 newRayOrigin += normal * (dot(newRayDirection, normal) < 0.0 ? -0.8 : 0.8);
-            }
-            else
-            {
+            } else {
                 vec3 idealReflection = reflect(rayDirection, normal);
                 newRayDirection = normalize(mix(newRayDirection, idealReflection, material.roughness));
                 newRayOrigin += normal * 0.8;
@@ -289,22 +285,22 @@ vec3 TracePath(vec3 rayOrigin, vec3 rayDirection) {
 }
 
 void main() {
-
-    float yf = gl_FragCoord.y / uResolution.y;      // 0…1
-    yf = 1.0 - yf;                                  // теперь 0 у дна, 1 — у потолка
-    vec2 uv = vec2(
-        (gl_FragCoord.x / uResolution.x) * 2.0 - 1.0,
-        yf * 2.0 - 1.0
-    );
+    vec2 uv = gl_FragCoord.xy / uResolution;
+    uv.y = 1.0 - uv.y; // инвертируем Y, чтобы согласовать с OpenGL
+    uv = uv * 2.0 - 1.0;
     uv.x *= uResolution.x / uResolution.y;
-
-    // Коррекция по аспекту (соотношение сторон)
-    uv.x *= uResolution.x / uResolution.y;
-
-    vec3 rayDirection = normalize(vec3(uv, -1.0));    // Направление луча
 
     createScene();
 
-    vec3 color = TracePath(vec3(0, 0, 3.5), rayDirection);
-    FragColor = vec4(color, 1.0f);
+    vec3 rayOrigin = vec3(0.0, 0.0, 3.5);
+    vec3 rayDirection = normalize(vec3(uv, -1.0));
+
+    vec3 color = TracePath(rayOrigin, rayDirection);
+
+    // accumulate with previous value
+    vec4 prev = imageLoad(accumImage, ivec2(gl_FragCoord.xy));
+    vec3 accum = mix(prev.rgb, color, 1.0 / (uSampleCount + 1.0));
+    imageStore(accumImage, ivec2(gl_FragCoord.xy), vec4(accum, 1.0));
+
+    FragColor = vec4(accum, 1.0);
 }
