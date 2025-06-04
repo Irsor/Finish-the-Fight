@@ -7,12 +7,12 @@ ff::PhysicalDevice::~PhysicalDevice() {
 }
 
 void ff::PhysicalDevice::displayQueueFamily() const {
-    // Получаем список семейств очередей устройства
+    // ГЏГ®Г«ГіГ·Г ГҐГ¬ Г±ГЇГЁГ±Г®ГЄ Г±ГҐГ¬ГҐГ©Г±ГІГў Г®Г·ГҐГ°ГҐГ¤ГҐГ© ГіГ±ГІГ°Г®Г©Г±ГІГўГ 
     std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
 
     if (queueFamilies.empty()) return;
 
-    // Перебираем и выводим информацию о каждом семействе очередей
+    // ГЏГҐГ°ГҐГЎГЁГ°Г ГҐГ¬ ГЁ ГўГ»ГўГ®Г¤ГЁГ¬ ГЁГ­ГґГ®Г°Г¬Г Г¶ГЁГѕ Г® ГЄГ Г¦Г¤Г®Г¬ Г±ГҐГ¬ГҐГ©Г±ГІГўГҐ Г®Г·ГҐГ°ГҐГ¤ГҐГ©
     for (const auto &family: queueFamilies) {
         std::cout << "Queue count: " << family.queueCount << std::endl;
         std::cout << "Flags: " << std::hex << static_cast<uint32_t>(family.queueFlags) << std::endl
@@ -45,16 +45,16 @@ uint32_t ff::PhysicalDevice::selectPresentationQueueFamilyIndex(const vk::Surfac
 }
 
 ff::SwapChainSupportDetails ff::PhysicalDevice::querySwapchainSupport(vk::SurfaceKHR surface) const {
-    // проверяем поддерживаемые возможности
+    // ГЇГ°Г®ГўГҐГ°ГїГҐГ¬ ГЇГ®Г¤Г¤ГҐГ°Г¦ГЁГўГ ГҐГ¬Г»ГҐ ГўГ®Г§Г¬Г®Г¦Г­Г®Г±ГІГЁ
     vk::PhysicalDeviceSurfaceInfo2KHR surfaceInfo{};
     surfaceInfo.setSurface(surface);
 
     auto surfaceCapabilities = device.getSurfaceCapabilities2KHR(surfaceInfo);
 
-    // получаем все поддерживаемые форматы
+    // ГЇГ®Г«ГіГ·Г ГҐГ¬ ГўГ±ГҐ ГЇГ®Г¤Г¤ГҐГ°Г¦ГЁГўГ ГҐГ¬Г»ГҐ ГґГ®Г°Г¬Г ГІГ»
     auto surfaceFormats = device.getSurfaceFormats2KHR(surfaceInfo);
 
-    // получаем все поддерживаемые режимы представления
+    // ГЇГ®Г«ГіГ·Г ГҐГ¬ ГўГ±ГҐ ГЇГ®Г¤Г¤ГҐГ°Г¦ГЁГўГ ГҐГ¬Г»ГҐ Г°ГҐГ¦ГЁГ¬Г» ГЇГ°ГҐГ¤Г±ГІГ ГўГ«ГҐГ­ГЁГї
     auto presentModes = device.getSurfacePresentModesKHR(surface);
 
     SwapChainSupportDetails result{};
@@ -91,7 +91,7 @@ ff::PhysicalDevice ff::PhysicalDevice::selectPhysicalDevice(const vk::Instance &
             auto features = device.getFeatures();
             auto extensions = device.enumerateDeviceExtensionProperties();
 
-            // Проверка поддержки нужных расширений
+            // ГЏГ°Г®ГўГҐГ°ГЄГ  ГЇГ®Г¤Г¤ГҐГ°Г¦ГЄГЁ Г­ГіГ¦Г­Г»Гµ Г°Г Г±ГёГЁГ°ГҐГ­ГЁГ©
             std::set<std::string> availableExtensions;
             for (const auto &ext: extensions) {
                 availableExtensions.insert(ext.extensionName);
@@ -108,7 +108,7 @@ ff::PhysicalDevice ff::PhysicalDevice::selectPhysicalDevice(const vk::Instance &
                 continue;
             }
 
-            // Проверка поддержки нужных фич (RayTracingPipelineFeatures и AccelerationStructureFeatures)
+            // ГЏГ°Г®ГўГҐГ°ГЄГ  ГЇГ®Г¤Г¤ГҐГ°Г¦ГЄГЁ Г­ГіГ¦Г­Г»Гµ ГґГЁГ· (RayTracingPipelineFeatures ГЁ AccelerationStructureFeatures)
             vk::PhysicalDeviceAccelerationStructureFeaturesKHR accelFeatures{};
             vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingFeatures{};
             vk::PhysicalDeviceFeatures2 features2{};
@@ -121,7 +121,19 @@ ff::PhysicalDevice ff::PhysicalDevice::selectPhysicalDevice(const vk::Instance &
                 continue;
             }
 
-            // Найдено подходящее устройство
+
+uint32_t ff::PhysicalDevice::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const {
+    auto memProperties = device.getMemoryProperties();
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    throw std::runtime_error("Failed to find suitable memory type.");
+}
+
+            // ГЌГ Г©Г¤ГҐГ­Г® ГЇГ®Г¤ГµГ®Г¤ГїГ№ГҐГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ®
             ff::PhysicalDevice selected;
             selected.device = device;
             selected.deviceProperties = props;

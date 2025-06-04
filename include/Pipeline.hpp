@@ -18,11 +18,15 @@ namespace ff {
         void destroy(const vk::Device &device) const;
 
         vk::Pipeline get() const;
+        vk::DescriptorSet getDescriptorSet() const { return descriptorSet; }
 
     private:
         vk::ShaderModule createShaderModule(const vk::Device &device, const std::vector<uint32_t> &shaderBianary) const;
         vk::ShaderModule fragmentShaderModule{};
         vk::ShaderModule vertexShaderModule{};
+        vk::DescriptorSetLayout descriptorSetLayout{};
+        vk::DescriptorPool descriptorPool{};
+        vk::DescriptorSet descriptorSet{};
 
         vk::Pipeline pipeline{};
         vk::PipelineLayout pipelineLayout{};

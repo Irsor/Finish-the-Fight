@@ -7,9 +7,10 @@
 
 namespace ff {
     struct SwapChainSupportDetails {
-        vk::SurfaceCapabilities2KHR capabilities;     // возможности поверхности
-        std::vector<vk::SurfaceFormat2KHR> formats;   // доступные форматы
-        std::vector<vk::PresentModeKHR> presentModes; // доступные режимы представления
+        uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
+        vk::SurfaceCapabilities2KHR capabilities;     // ГўГ®Г§Г¬Г®Г¦Г­Г®Г±ГІГЁ ГЇГ®ГўГҐГ°ГµГ­Г®Г±ГІГЁ
+        std::vector<vk::SurfaceFormat2KHR> formats;   // Г¤Г®Г±ГІГіГЇГ­Г»ГҐ ГґГ®Г°Г¬Г ГІГ»
+        std::vector<vk::PresentModeKHR> presentModes; // Г¤Г®Г±ГІГіГЇГ­Г»ГҐ Г°ГҐГ¦ГЁГ¬Г» ГЇГ°ГҐГ¤Г±ГІГ ГўГ«ГҐГ­ГЁГї
     };
 
     class PhysicalDevice {
