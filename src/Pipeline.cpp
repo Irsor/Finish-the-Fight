@@ -1,4 +1,5 @@
 #include "Pipeline.hpp"
+#include "App.hpp"
 
 ff::Pipeline::Pipeline() {
 }
@@ -13,7 +14,7 @@ void ff::Pipeline::init(
         const std::string &vertexShaderPath,
         const std::string &fragmentShaderPath,
         const ff::PhysicalDevice &physicalDevice) {
-    // 1) Загрузка шейдеров
+    // 1) Р—Р°РіСЂСѓР·РєР° С€РµР№РґРµСЂРѕРІ
     auto vertCode = ff::utils::readFile(vertexShaderPath);
     auto fragCode = ff::utils::readFile(fragmentShaderPath);
     vertexShaderModule   = createShaderModule(device, vertCode);
@@ -29,12 +30,12 @@ void ff::Pipeline::init(
              .setPName("main");
     std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {{ vertStage, fragStage }};
 
-    // 2) Создание UBO-буфера под std140 binding=0
+    // 2) РЎРѕР·РґР°РЅРёРµ UBO-Р±СѓС„РµСЂР° РїРѕРґ std140 binding=0
     struct alignas(16) UBO {
         float uResolution[2];
-        float _padding1[2];  // выравнивание vec2 до 16 байт
+        float _padding1[2];  // РІС‹СЂР°РІРЅРёРІР°РЅРёРµ vec2 РґРѕ 16 Р±Р°Р№С‚
         float uTime;
-        float _padding2[3];  // выравнивание всей структуры до 16 байт
+        float _padding2[3];  // РІС‹СЂР°РІРЅРёРІР°РЅРёРµ РІСЃРµР№ СЃС‚СЂСѓРєС‚СѓСЂС‹ РґРѕ 16 Р±Р°Р№С‚
     };
 
     vk::BufferCreateInfo bufInfo{};
@@ -124,7 +125,8 @@ void ff::Pipeline::init(
     rasterization.setLineWidth(1.0f);
 
     vk::PipelineMultisampleStateCreateInfo multisampling{};
-    multisampling.setMinSampleShading(1.0f);
+    multisampling.setRasterizationSamples(ff::App::SAMPLE_COUNT);
+    multisampling.setSampleShadingEnable(VK_FALSE);
 
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.setColorWriteMask(
@@ -176,7 +178,7 @@ void ff::Pipeline::destroy(const vk::Device &device) const {
 
 vk::Pipeline ff::Pipeline::get() const { return pipeline; }
 
-// Обновление UBO перед отрисовкой void 
+// РћР±РЅРѕРІР»РµРЅРёРµ UBO РїРµСЂРµРґ РѕС‚СЂРёСЃРѕРІРєРѕР№ void 
 void ff::Pipeline::updateUniform(
           const vk::Device &device,
           const vk::Extent2D &resolution,

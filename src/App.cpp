@@ -1,4 +1,5 @@
-﻿#include "App.hpp"
+#include "App.hpp"
+#include <array>
 
 ff::App::App(const Window &window) {
     createInstance();
@@ -8,6 +9,7 @@ ff::App::App(const Window &window) {
     swapchain.init(instance, physicalDevice, device, surface, window);
     createImageViews();
     createRenderPass();
+    createColorResources();
     pipeline.init(device, swapchain, renderPass, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv", physicalDevice);
     createFrameBuffers();
     createCommandPool();
@@ -20,6 +22,7 @@ ff::App::~App() {
     pipeline.destroy(device);
     swapchain.destroy(device);
     destroyImageViews();
+    destroyColorResources();
     destroyFramebuffers();
     device.destroyRenderPass(renderPass);
     device.destroySemaphore(imageAvailableSemaphore);
@@ -187,6 +190,52 @@ void ff::App::destroyImageViews() const {
     }
 }
 
+void ff::App::createColorResources() {
+    auto format = swapchain.getSurfaceFormat().surfaceFormat.format;
+    auto extent = swapchain.getExtent();
+
+    colorImages.resize(imageViews.size());
+    colorImageMemories.resize(imageViews.size());
+    colorImageViews.resize(imageViews.size());
+
+    for (size_t i = 0; i < imageViews.size(); ++i) {
+        vk::ImageCreateInfo imageInfo{};
+        imageInfo.setImageType(vk::ImageType::e2D);
+        imageInfo.setFormat(format);
+        imageInfo.setExtent({extent.width, extent.height, 1});
+        imageInfo.setMipLevels(1);
+        imageInfo.setArrayLayers(1);
+        imageInfo.setSamples(ff::App::SAMPLE_COUNT);
+        imageInfo.setTiling(vk::ImageTiling::eOptimal);
+        imageInfo.setUsage(vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment);
+
+        colorImages[i] = device.createImage(imageInfo);
+
+        auto memReq = device.getImageMemoryRequirements(colorImages[i]);
+        vk::MemoryAllocateInfo allocInfo{};
+        allocInfo.setAllocationSize(memReq.size);
+        allocInfo.setMemoryTypeIndex(physicalDevice.findMemoryType(memReq.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal));
+        colorImageMemories[i] = device.allocateMemory(allocInfo);
+        device.bindImageMemory(colorImages[i], colorImageMemories[i], 0);
+
+        vk::ImageViewCreateInfo viewInfo{};
+        viewInfo.setImage(colorImages[i]);
+        viewInfo.setViewType(vk::ImageViewType::e2D);
+        viewInfo.setFormat(format);
+        viewInfo.setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+
+        colorImageViews[i] = device.createImageView(viewInfo);
+    }
+}
+
+void ff::App::destroyColorResources() const {
+    for (size_t i = 0; i < colorImages.size(); ++i) {
+        if (colorImageViews[i]) device.destroyImageView(colorImageViews[i]);
+        if (colorImages[i]) device.destroyImage(colorImages[i]);
+        if (colorImageMemories[i]) device.freeMemory(colorImageMemories[i]);
+    }
+}
+
 vk::Format ff::App::findSupportedDepthFormat() {
     std::vector<vk::Format> candidates = {
             vk::Format::eD32Sfloat,
@@ -207,16 +256,27 @@ void ff::App::createRenderPass() {
     // Получаем поддерживаемый формат глубины
     vk::Format depthFormat = findSupportedDepthFormat();
 
-    // 1. Цветовое вложение
+    // 1. Multisampled color attachment
     vk::AttachmentDescription colorAttachment{};
     colorAttachment.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format);
-    colorAttachment.setSamples(vk::SampleCountFlagBits::e1);
+    colorAttachment.setSamples(ff::App::SAMPLE_COUNT);
     colorAttachment.setLoadOp(vk::AttachmentLoadOp::eClear);
-    colorAttachment.setStoreOp(vk::AttachmentStoreOp::eStore);
+    colorAttachment.setStoreOp(vk::AttachmentStoreOp::eDontCare);
     colorAttachment.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
     colorAttachment.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
     colorAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
-    colorAttachment.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
+    colorAttachment.setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal);
+
+    // 2. Resolve attachment to presentable image
+    vk::AttachmentDescription colorResolve{};
+    colorResolve.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format);
+    colorResolve.setSamples(vk::SampleCountFlagBits::e1);
+    colorResolve.setLoadOp(vk::AttachmentLoadOp::eDontCare);
+    colorResolve.setStoreOp(vk::AttachmentStoreOp::eStore);
+    colorResolve.setStencilLoadOp(vk::AttachmentLoadOp::eDontCare);
+    colorResolve.setStencilStoreOp(vk::AttachmentStoreOp::eDontCare);
+    colorResolve.setInitialLayout(vk::ImageLayout::eUndefined);
+    colorResolve.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
 
     // 2. Глубинное вложение (с корректным форматом!)
     // vk::AttachmentDescription depthAttachment{};
@@ -234,15 +294,15 @@ void ff::App::createRenderPass() {
     colorRef.setAttachment(0);
     colorRef.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
 
-    vk::AttachmentReference depthRef{};
-    depthRef.setAttachment(1);
-    depthRef.setLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    vk::AttachmentReference colorResolveRef{};
+    colorResolveRef.setAttachment(1);
+    colorResolveRef.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
 
     // 4. Subpass
     vk::SubpassDescription subpass{};
     subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics);
     subpass.setColorAttachments(colorRef);
-    //subpass.setPDepthStencilAttachment(&depthRef);
+    subpass.setResolveAttachments(colorResolveRef);
 
     // 5. Зависимости
     vk::SubpassDependency dependency{};
@@ -254,7 +314,7 @@ void ff::App::createRenderPass() {
     dependency.setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite);
 
     // 6. RenderPass
-    std::array<vk::AttachmentDescription, 1> attachments = {colorAttachment};
+    std::array<vk::AttachmentDescription, 2> attachments = {colorAttachment, colorResolve};
 
     vk::RenderPassCreateInfo renderPassInfo{};
     renderPassInfo.setAttachments(attachments);
@@ -270,11 +330,13 @@ void ff::App::createRenderPass() {
 }
 
 void ff::App::createFrameBuffers() {
-    for (const auto& imageView : imageViews) {
+    for (size_t i = 0; i < imageViews.size(); ++i) {
+        std::array<vk::ImageView, 2> attachments = {colorImageViews[i], imageViews[i]};
+
         vk::FramebufferCreateInfo frameBufferCreateInfo{};
         frameBufferCreateInfo.setRenderPass(renderPass);
-        frameBufferCreateInfo.setAttachmentCount(1);
-        frameBufferCreateInfo.setPAttachments(&imageView);
+        frameBufferCreateInfo.setAttachmentCount(static_cast<uint32_t>(attachments.size()));
+        frameBufferCreateInfo.setPAttachments(attachments.data());
         frameBufferCreateInfo.setWidth(swapchain.getExtent().width);
         frameBufferCreateInfo.setHeight(swapchain.getExtent().height);
         frameBufferCreateInfo.setLayers(1);

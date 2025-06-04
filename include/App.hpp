@@ -20,45 +20,50 @@ namespace ff {
         App(const Window &window);
         ~App();
 
+        static constexpr vk::SampleCountFlagBits SAMPLE_COUNT = vk::SampleCountFlagBits::e16;
+
         void drawFrame();
 
     private:
 
-        // Создание инстанса
+        // РЎРѕР·РґР°РЅРёРµ РёРЅСЃС‚Р°РЅСЃР°
         void createInstance();
         const std::vector<const char*> getExtensions() const;
 
-        // Создание логического устройства
+        // РЎРѕР·РґР°РЅРёРµ Р»РѕРіРёС‡РµСЃРєРѕРіРѕ СѓСЃС‚СЂРѕР№СЃС‚РІР°
         void createDevice();
 
-        // Создание очередей
+        // РЎРѕР·РґР°РЅРёРµ РѕС‡РµСЂРµРґРµР№
         void createQueues();
 
-        // Создание поверхности
+        // РЎРѕР·РґР°РЅРёРµ РїРѕРІРµСЂС…РЅРѕСЃС‚Рё
         void createSurface(const Window &window);
 
-        // Создание представлений изображений и удаление
+        // РЎРѕР·РґР°РЅРёРµ РїСЂРµРґСЃС‚Р°РІР»РµРЅРёР№ РёР·РѕР±СЂР°Р¶РµРЅРёР№ Рё СѓРґР°Р»РµРЅРёРµ
         void createImageViews();
         void destroyImageViews() const;
         vk::Format findSupportedDepthFormat();
 
-        // Создание прохода рендера
+        // РЎРѕР·РґР°РЅРёРµ РїСЂРѕС…РѕРґР° СЂРµРЅРґРµСЂР°
         void createRenderPass();
 
-        // Создание фреймбуфферов
+        void createColorResources();
+        void destroyColorResources() const;
+
+        // РЎРѕР·РґР°РЅРёРµ С„СЂРµР№РјР±СѓС„С„РµСЂРѕРІ
         void createFrameBuffers();
         void destroyFramebuffers() const;
 
-        // Создание пула команд
+        // РЎРѕР·РґР°РЅРёРµ РїСѓР»Р° РєРѕРјР°РЅРґ
         void createCommandPool();
 
-        // Создание буфера команд
+        // РЎРѕР·РґР°РЅРёРµ Р±СѓС„РµСЂР° РєРѕРјР°РЅРґ
         void allocateCommandBuffers();
 
-        // Запись данных в буфер команд
+        // Р—Р°РїРёСЃСЊ РґР°РЅРЅС‹С… РІ Р±СѓС„РµСЂ РєРѕРјР°РЅРґ
         void writeDataIntoCommandBuffers(uint32_t imageIndex);
 
-        // Семафоры и fence
+        // РЎРµРјР°С„РѕСЂС‹ Рё fence
         void createSyncObjects();
 
         vk::Instance instance{};
@@ -69,17 +74,20 @@ namespace ff {
         std::vector<vk::ImageView> imageViews{};
         ff::Pipeline pipeline{};
         vk::RenderPass renderPass{};
+        std::vector<vk::Image> colorImages{};
+        std::vector<vk::DeviceMemory> colorImageMemories{};
+        std::vector<vk::ImageView> colorImageViews{};
         std::vector<vk::Framebuffer> framebuffers{};
         vk::CommandPool commandPool{};
         std::vector<vk::CommandBuffer> commandBuffers{};
 
         // ---
-        // Очереди
+        // РћС‡РµСЂРµРґРё
         vk::Queue graphicsQueue{};
         vk::Queue presentQueue{};
         // ---
 
-        // Объекты синхронизации
+        // РћР±СЉРµРєС‚С‹ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё
         vk::Semaphore imageAvailableSemaphore{};
         vk::Semaphore renderFinishedSemaphore{};
         vk::Fence inFlightFense{};
