@@ -1,4 +1,5 @@
 #include "App.hpp"
+#include "Texture.hpp"
 
 ff::App::App(const Window &window) {
     createInstance();
@@ -10,6 +11,18 @@ ff::App::App(const Window &window) {
     createRenderPass();
     pipeline.init(device, swapchain, renderPass, "D:\\Sources\\Pure\\shaders\\vert.spv", "D:\\Sources\\Pure\\shaders\\frag.spv");
     createFrameBuffers();
+    accumulator.init(device, physicalDevice.getDevice(), swapchain.getExtent(), swapchain.getSurfaceFormat().surfaceFormat.format);
+    // update descriptor set
+    vk::DescriptorImageInfo imageInfo{};
+    imageInfo.setImageView(accumulator.getImageView());
+    imageInfo.setSampler(accumulator.getSampler());
+    imageInfo.setImageLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+    vk::WriteDescriptorSet write{};
+    write.setDstSet(pipeline.getDescriptorSet());
+    write.setDstBinding(0);
+    write.setDescriptorType(vk::DescriptorType::eCombinedImageSampler);
+    write.setImageInfo(imageInfo);
+    device.updateDescriptorSets(write, nullptr);
     createCommandPool();
     allocateCommandBuffers();
     createSyncObjects();
@@ -34,7 +47,7 @@ ff::App::~App() {
 
 void ff::App::createInstance() {
     try {
-        // Информация о приложении
+        // Г€Г­ГґГ®Г°Г¬Г Г¶ГЁГї Г® ГЇГ°ГЁГ«Г®Г¦ГҐГ­ГЁГЁ
         vk::ApplicationInfo appInfo{};
         appInfo.setPApplicationName("Pure Vulkan");
         appInfo.setApplicationVersion(1.0);
@@ -45,7 +58,7 @@ void ff::App::createInstance() {
         vk::InstanceCreateInfo instanceCreateInfo{};
         instanceCreateInfo.setPApplicationInfo(&appInfo);
 
-        // Устанавливаем расширения
+        // Г“Г±ГІГ Г­Г ГўГ«ГЁГўГ ГҐГ¬ Г°Г Г±ГёГЁГ°ГҐГ­ГЁГї
         auto extensions = getExtensions();
         instanceCreateInfo.setEnabledExtensionCount(extensions.size());
         instanceCreateInfo.setPpEnabledExtensionNames(extensions.data());
@@ -59,13 +72,13 @@ void ff::App::createInstance() {
         instanceCreateInfo.setPpEnabledLayerNames(validationLayers.data());
 #endif
 
-        // Создание инстанса Vulkan
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЁГ­Г±ГІГ Г­Г±Г  Vulkan
         instance = vk::createInstance(instanceCreateInfo);
 
-        // Создание инстанса Vulkan
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЁГ­Г±ГІГ Г­Г±Г  Vulkan
         instance = vk::createInstance(instanceCreateInfo);
     } catch (const std::exception &ex) {
-        std::cerr << "Ошибка создания Vulkan Instance: " << ex.what() << std::endl;
+        std::cerr << "ГЋГёГЁГЎГЄГ  Г±Г®Г§Г¤Г Г­ГЁГї Vulkan Instance: " << ex.what() << std::endl;
     }
 }
 
@@ -100,14 +113,14 @@ void ff::App::createDevice() {
         deviceQueueCreateInfo.push_back(queueCreateInfo);
     }
 
-    // Подключаемые расширения
+    // ГЏГ®Г¤ГЄГ«ГѕГ·Г ГҐГ¬Г»ГҐ Г°Г Г±ГёГЁГ°ГҐГ­ГЁГї
     std::vector<const char *> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
     };
 
-    // На будущее
+    // ГЌГ  ГЎГіГ¤ГіГ№ГҐГҐ
     vk::PhysicalDeviceFeatures features{};
     features.geometryShader = vk::True;
     features.tessellationShader = vk::True;
@@ -137,23 +150,23 @@ void ff::App::createSurface(const Window &window) {
 
     GLFWwindow *glfwWindow = window.get();
 
-    // Используем GLFW для создания VkSurfaceKHR
+    // Г€Г±ГЇГ®Г«ГјГ§ГіГҐГ¬ GLFW Г¤Г«Гї Г±Г®Г§Г¤Г Г­ГЁГї VkSurfaceKHR
     if (glfwCreateWindowSurface(static_cast<VkInstance>(instance), glfwWindow, nullptr, &rawSurface) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create window surface!");
     }
 
-    // Оборачиваем VkSurfaceKHR в vk::SurfaceKHR
+    // ГЋГЎГ®Г°Г Г·ГЁГўГ ГҐГ¬ VkSurfaceKHR Гў vk::SurfaceKHR
     surface = vk::SurfaceKHR(rawSurface);
 }
 
 void ff::App::createImageViews() {
-    // Получение изображений
+    // ГЏГ®Г«ГіГ·ГҐГ­ГЁГҐ ГЁГ§Г®ГЎГ°Г Г¦ГҐГ­ГЁГ©
     auto swapchainImages = device.getSwapchainImagesKHR(swapchain.get());
 
     for (const auto &swapchainImage: swapchainImages) {
         vk::ImageViewCreateInfo imageViewCreateInfo{};
         imageViewCreateInfo.setImage(swapchainImage);
-        imageViewCreateInfo.setViewType(vk::ImageViewType::e2D);// изображение рассматривается как 2D-текстура
+        imageViewCreateInfo.setViewType(vk::ImageViewType::e2D);// ГЁГ§Г®ГЎГ°Г Г¦ГҐГ­ГЁГҐ Г°Г Г±Г±Г¬Г ГІГ°ГЁГўГ ГҐГІГ±Гї ГЄГ ГЄ 2D-ГІГҐГЄГ±ГІГіГ°Г 
         imageViewCreateInfo.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format);
 
         vk::ComponentMapping components{};
@@ -171,7 +184,7 @@ void ff::App::createImageViews() {
         subresourceRange.setLayerCount(1);
         imageViewCreateInfo.setSubresourceRange(subresourceRange);
 
-        // Создание представления изображения
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЇГ°ГҐГ¤Г±ГІГ ГўГ«ГҐГ­ГЁГї ГЁГ§Г®ГЎГ°Г Г¦ГҐГ­ГЁГї
         try {
             imageViews.push_back(device.createImageView(imageViewCreateInfo));
         } catch (const std::exception &ex) {
@@ -204,10 +217,10 @@ vk::Format ff::App::findSupportedDepthFormat() {
 }
 
 void ff::App::createRenderPass() {
-    // Получаем поддерживаемый формат глубины
+    // ГЏГ®Г«ГіГ·Г ГҐГ¬ ГЇГ®Г¤Г¤ГҐГ°Г¦ГЁГўГ ГҐГ¬Г»Г© ГґГ®Г°Г¬Г ГІ ГЈГ«ГіГЎГЁГ­Г»
     vk::Format depthFormat = findSupportedDepthFormat();
 
-    // 1. Цветовое вложение
+    // 1. Г–ГўГҐГІГ®ГўГ®ГҐ ГўГ«Г®Г¦ГҐГ­ГЁГҐ
     vk::AttachmentDescription colorAttachment{};
     colorAttachment.setFormat(swapchain.getSurfaceFormat().surfaceFormat.format);
     colorAttachment.setSamples(vk::SampleCountFlagBits::e1);
@@ -218,7 +231,7 @@ void ff::App::createRenderPass() {
     colorAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
     colorAttachment.setFinalLayout(vk::ImageLayout::ePresentSrcKHR);
 
-    // 2. Глубинное вложение (с корректным форматом!)
+    // 2. ГѓГ«ГіГЎГЁГ­Г­Г®ГҐ ГўГ«Г®Г¦ГҐГ­ГЁГҐ (Г± ГЄГ®Г°Г°ГҐГЄГІГ­Г»Г¬ ГґГ®Г°Г¬Г ГІГ®Г¬!)
     // vk::AttachmentDescription depthAttachment{};
     // depthAttachment.setFormat(depthFormat);
     // depthAttachment.setSamples(vk::SampleCountFlagBits::e1);
@@ -229,7 +242,7 @@ void ff::App::createRenderPass() {
     // depthAttachment.setInitialLayout(vk::ImageLayout::eUndefined);
     // depthAttachment.setFinalLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-    // 3. Ссылки
+    // 3. Г‘Г±Г»Г«ГЄГЁ
     vk::AttachmentReference colorRef{};
     colorRef.setAttachment(0);
     colorRef.setLayout(vk::ImageLayout::eColorAttachmentOptimal);
@@ -244,7 +257,7 @@ void ff::App::createRenderPass() {
     subpass.setColorAttachments(colorRef);
     //subpass.setPDepthStencilAttachment(&depthRef);
 
-    // 5. Зависимости
+    // 5. Г‡Г ГўГЁГ±ГЁГ¬Г®Г±ГІГЁ
     vk::SubpassDependency dependency{};
     dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL);
     dependency.setDstSubpass(0);
@@ -261,7 +274,7 @@ void ff::App::createRenderPass() {
     renderPassInfo.setSubpasses(subpass);
     renderPassInfo.setDependencies(dependency);
 
-    // 7. Создание RenderPass
+    // 7. Г‘Г®Г§Г¤Г Г­ГЁГҐ RenderPass
     try {
         renderPass = device.createRenderPass(renderPassInfo);
     } catch (const std::exception &ex) {
@@ -288,6 +301,7 @@ void ff::App::createFrameBuffers() {
 }
 
 void ff::App::destroyFramebuffers() const {
+    accumulator.destroy(device);
     for (const auto& framebuffer : framebuffers) {
         device.destroyFramebuffer(framebuffer);
     }
@@ -307,7 +321,7 @@ void ff::App::createCommandPool() {
 
 void ff::App::allocateCommandBuffers() {
     
-    // Создание
+    // Г‘Г®Г§Г¤Г Г­ГЁГҐ
     vk::CommandBufferAllocateInfo allocateInfo{};
     allocateInfo.setCommandPool(commandPool);
     allocateInfo.setLevel(vk::CommandBufferLevel::ePrimary);
@@ -321,7 +335,7 @@ void ff::App::allocateCommandBuffers() {
 }
 
 void ff::App::writeDataIntoCommandBuffers(uint32_t imageIndex) {
-    // Запись
+    // Г‡Г ГЇГЁГ±Гј
     for (uint32_t i = 0; i < commandBuffers.size(); i++) {
         vk::CommandBufferBeginInfo beginInfo{};
         beginInfo.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -329,7 +343,7 @@ void ff::App::writeDataIntoCommandBuffers(uint32_t imageIndex) {
         try {
             commandBuffers[i].begin(beginInfo);
 
-            // Данные для ренедера
+            // Г„Г Г­Г­Г»ГҐ Г¤Г«Гї Г°ГҐГ­ГҐГ¤ГҐГ°Г 
             vk::Rect2D renderArea{};
             renderArea.setExtent(swapchain.getExtent());
             vk::ClearValue clearColor;
@@ -344,7 +358,7 @@ void ff::App::writeDataIntoCommandBuffers(uint32_t imageIndex) {
             renderPassBeginInfo.setClearValues({clearColor});
 
             try {
-                // Запись данных
+                // Г‡Г ГЇГЁГ±Гј Г¤Г Г­Г­Г»Гµ
                 commandBuffers[i].beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
                 commandBuffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.get());
                 commandBuffers[i].draw(3, 1, 0, 0);
@@ -376,29 +390,29 @@ void ff::App::createSyncObjects() {
 }
 
 void ff::App::drawFrame() {
-    // Ждём завершения предыдущего кадра
+    // Г†Г¤ВёГ¬ Г§Г ГўГҐГ°ГёГҐГ­ГЁГї ГЇГ°ГҐГ¤Г»Г¤ГіГ№ГҐГЈГ® ГЄГ Г¤Г°Г 
     // device.waitForFences({inFlightFence.get()}, vk::True, UINT64_MAX);
     device.waitForFences({inFlightFense}, vk::True, UINT64_MAX);
     device.resetFences(inFlightFense);
 
-    // Получаем изображение из цепочки свопчейна
+    // ГЏГ®Г«ГіГ·Г ГҐГ¬ ГЁГ§Г®ГЎГ°Г Г¦ГҐГ­ГЁГҐ ГЁГ§ Г¶ГҐГЇГ®Г·ГЄГЁ Г±ГўГ®ГЇГ·ГҐГ©Г­Г 
     vk::AcquireNextImageInfoKHR imageInfo{};
     imageInfo.setSwapchain(swapchain.get());
     imageInfo.setTimeout(UINT64_MAX);
     imageInfo.setSemaphore(imageAvailableSemaphore);
-    imageInfo.setDeviceMask(1);// всё равно нужен, так как используем acquireNextImage2KHR
+    imageInfo.setDeviceMask(1);// ГўГ±Вё Г°Г ГўГ­Г® Г­ГіГ¦ГҐГ­, ГІГ ГЄ ГЄГ ГЄ ГЁГ±ГЇГ®Г«ГјГ§ГіГҐГ¬ acquireNextImage2KHR
 
     auto [result, imageIndex] = device.acquireNextImage2KHR(imageInfo);
 
     if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
-        throw std::runtime_error("Не удалось получить изображение из swapchain.");
+        throw std::runtime_error("ГЌГҐ ГіГ¤Г Г«Г®Г±Гј ГЇГ®Г«ГіГ·ГЁГІГј ГЁГ§Г®ГЎГ°Г Г¦ГҐГ­ГЁГҐ ГЁГ§ swapchain.");
     }
 
-    // Сброс и запись команд
+    // Г‘ГЎГ°Г®Г± ГЁ Г§Г ГЇГЁГ±Гј ГЄГ®Г¬Г Г­Г¤
     commandBuffers[imageIndex].reset();
     writeDataIntoCommandBuffers(imageIndex);
 
-    // Настройка обычного submit с vk::SubmitInfo
+    // ГЌГ Г±ГІГ°Г®Г©ГЄГ  Г®ГЎГ»Г·Г­Г®ГЈГ® submit Г± vk::SubmitInfo
     vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
     vk::SubmitInfo submitInfo{};
@@ -407,10 +421,10 @@ void ff::App::drawFrame() {
     submitInfo.setCommandBuffers(commandBuffers[imageIndex]);
     submitInfo.setSignalSemaphores(renderFinishedSemaphore);
 
-    // Submit в графическую очередь
+    // Submit Гў ГЈГ°Г ГґГЁГ·ГҐГ±ГЄГіГѕ Г®Г·ГҐГ°ГҐГ¤Гј
     graphicsQueue.submit(submitInfo, inFlightFense);
 
-    // Презентация
+    // ГЏГ°ГҐГ§ГҐГ­ГІГ Г¶ГЁГї
     vk::PresentInfoKHR presentInfo{};
     presentInfo.setWaitSemaphores(renderFinishedSemaphore);
     std::vector<vk::SwapchainKHR> swapchains = {swapchain.get()};
@@ -419,6 +433,6 @@ void ff::App::drawFrame() {
 
     vk::Result presentResult = presentQueue.presentKHR(&presentInfo);
     if (presentResult != vk::Result::eSuccess && presentResult != vk::Result::eSuboptimalKHR) {
-        throw std::runtime_error("Не удалось представить изображение.");
+        throw std::runtime_error("ГЌГҐ ГіГ¤Г Г«Г®Г±Гј ГЇГ°ГҐГ¤Г±ГІГ ГўГЁГІГј ГЁГ§Г®ГЎГ°Г Г¦ГҐГ­ГЁГҐ.");
     }
 }

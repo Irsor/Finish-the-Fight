@@ -44,6 +44,7 @@ add_executable(${PROJECT_NAME} main.cpp
     src/Window.cpp
     src/Swapchain.cpp
     src/Pipeline.cpp
+    src/Texture.cpp
     src/Utils/FileUtils.cpp
 )
 

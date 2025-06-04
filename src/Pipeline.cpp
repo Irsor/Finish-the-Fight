@@ -7,34 +7,42 @@ ff::Pipeline::~Pipeline() {
 }
 
 void ff::Pipeline::init(const vk::Device &device, const ff::Swapchain &swapchain, const vk::RenderPass &renderPass, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
-    // загрузка файлов шейдеров
+    vk::DescriptorSetLayoutBinding samplerBinding{};
+    samplerBinding.setBinding(0);
+    samplerBinding.setDescriptorType(vk::DescriptorType::eCombinedImageSampler);
+    samplerBinding.setDescriptorCount(1);
+    samplerBinding.setStageFlags(vk::ShaderStageFlagBits::eFragment);
+    vk::DescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.setBindings(samplerBinding);
+    descriptorSetLayout = device.createDescriptorSetLayout(layoutInfo);
+    // Г§Г ГЈГ°ГіГ§ГЄГ  ГґГ Г©Г«Г®Гў ГёГҐГ©Г¤ГҐГ°Г®Гў
     auto vertShaderCode = ff::utils::readFile(vertexShaderPath);
     auto fragShaderCode = ff::utils::readFile(fragmentShaderPath);
 
-    // преобразование кода шейдеров в модули шейдеров
+    // ГЇГ°ГҐГ®ГЎГ°Г Г§Г®ГўГ Г­ГЁГҐ ГЄГ®Г¤Г  ГёГҐГ©Г¤ГҐГ°Г®Гў Гў Г¬Г®Г¤ГіГ«ГЁ ГёГҐГ©Г¤ГҐГ°Г®Гў
     vertexShaderModule = createShaderModule(device, vertShaderCode);
     fragmentShaderModule = createShaderModule(device, fragShaderCode);
 
-    // Этап вершинного шейдера
+    // ГќГІГ ГЇ ГўГҐГ°ГёГЁГ­Г­Г®ГЈГ® ГёГҐГ©Г¤ГҐГ°Г 
     vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
-    vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex);// этап: вершинный
-    vertShaderStageInfo.setModule(vertexShaderModule);             // модуль вершинного шейдера
-    vertShaderStageInfo.setPName("main");                          // точка входа — функция main
+    vertShaderStageInfo.setStage(vk::ShaderStageFlagBits::eVertex);// ГЅГІГ ГЇ: ГўГҐГ°ГёГЁГ­Г­Г»Г©
+    vertShaderStageInfo.setModule(vertexShaderModule);             // Г¬Г®Г¤ГіГ«Гј ГўГҐГ°ГёГЁГ­Г­Г®ГЈГ® ГёГҐГ©Г¤ГҐГ°Г 
+    vertShaderStageInfo.setPName("main");                          // ГІГ®Г·ГЄГ  ГўГµГ®Г¤Г  вЂ” ГґГіГ­ГЄГ¶ГЁГї main
 
-    // Этап фрагментного шейдера
+    // ГќГІГ ГЇ ГґГ°Г ГЈГ¬ГҐГ­ГІГ­Г®ГЈГ® ГёГҐГ©Г¤ГҐГ°Г 
     vk::PipelineShaderStageCreateInfo fragShaderStageInfo{};
-    fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment);// этап: фрагментный
-    fragShaderStageInfo.setModule(fragmentShaderModule);             // модуль фрагментного шейдера
-    fragShaderStageInfo.setPName("main");                            // точка входа — функция main
+    fragShaderStageInfo.setStage(vk::ShaderStageFlagBits::eFragment);// ГЅГІГ ГЇ: ГґГ°Г ГЈГ¬ГҐГ­ГІГ­Г»Г©
+    fragShaderStageInfo.setModule(fragmentShaderModule);             // Г¬Г®Г¤ГіГ«Гј ГґГ°Г ГЈГ¬ГҐГ­ГІГ­Г®ГЈГ® ГёГҐГ©Г¤ГҐГ°Г 
+    fragShaderStageInfo.setPName("main");                            // ГІГ®Г·ГЄГ  ГўГµГ®Г¤Г  вЂ” ГґГіГ­ГЄГ¶ГЁГї main
 
     std::array<vk::PipelineShaderStageCreateInfo, 2> shaderStages = {vertShaderStageInfo, fragShaderStageInfo};
 
     auto bindingDescription = ff::Vertex::getBindingDescription();
     auto attributeDescriptions = ff::Vertex::getAttributeDescriptions();
 
-    // Формат данных вершин, которые будут переданы в вершинный шейдер
+    // Г”Г®Г°Г¬Г ГІ Г¤Г Г­Г­Г»Гµ ГўГҐГ°ГёГЁГ­, ГЄГ®ГІГ®Г°Г»ГҐ ГЎГіГ¤ГіГІ ГЇГҐГ°ГҐГ¤Г Г­Г» Гў ГўГҐГ°ГёГЁГ­Г­Г»Г© ГёГҐГ©Г¤ГҐГ°
     // 
-    // ПУСТО
+    // ГЏГ“Г‘Г’ГЋ
     // 
     // vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
     // vertexInputStateCreateInfo.setVertexBindingDescriptionCount(1);
@@ -43,55 +51,68 @@ void ff::Pipeline::init(const vk::Device &device, const ff::Swapchain &swapchain
     // vertexInputStateCreateInfo.setPVertexAttributeDescriptions(attributeDescriptions.data());
 
     vk::PipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
-    vertexInputStateCreateInfo.setVertexBindingDescriptions({});// Пусто
-    vertexInputStateCreateInfo.setVertexAttributeDescriptions({});// Пусто
+    vertexInputStateCreateInfo.setVertexBindingDescriptions({});// ГЏГіГ±ГІГ®
+    vertexInputStateCreateInfo.setVertexAttributeDescriptions({});// ГЏГіГ±ГІГ®
 
-    // Параметры сборки входных данных конвеера
+    // ГЏГ Г°Г Г¬ГҐГІГ°Г» Г±ГЎГ®Г°ГЄГЁ ГўГµГ®Г¤Г­Г»Гµ Г¤Г Г­Г­Г»Гµ ГЄГ®Г­ГўГҐГҐГ°Г 
     vk::PipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo{};
     inputAssemblyStateCreateInfo.setTopology(vk::PrimitiveTopology::eTriangleList);
 
-    // Область просмотра
-    // Область буфера кадра, в которую будет визуализироваться вывод
+    // ГЋГЎГ«Г Г±ГІГј ГЇГ°Г®Г±Г¬Г®ГІГ°Г 
+    // ГЋГЎГ«Г Г±ГІГј ГЎГіГґГҐГ°Г  ГЄГ Г¤Г°Г , Гў ГЄГ®ГІГ®Г°ГіГѕ ГЎГіГ¤ГҐГІ ГўГЁГ§ГіГ Г«ГЁГ§ГЁГ°Г®ГўГ ГІГјГ±Гї ГўГ»ГўГ®Г¤
     vk::Viewport viewport{};
 
-    // положение в пикселях
+    // ГЇГ®Г«Г®Г¦ГҐГ­ГЁГҐ Гў ГЇГЁГЄГ±ГҐГ«ГїГµ
     viewport.setX(0.0f);
     viewport.setY(0.0f);
 
-    // размеры области
+    // Г°Г Г§Г¬ГҐГ°Г» Г®ГЎГ«Г Г±ГІГЁ
     viewport.setWidth(static_cast<float>(swapchain.getExtent().width));
     viewport.setHeight(static_cast<float>(swapchain.getExtent().height));
 
-    // диапазон глубины
+    // Г¤ГЁГ ГЇГ Г§Г®Г­ ГЈГ«ГіГЎГЁГ­Г»
     viewport.setMinDepth(0.0f);
     viewport.setMaxDepth(1.0f);
 
-    // Ножницы (scissors) определяют прямоугольную область, в которой фактически будут храниться пиксели
+    // ГЌГ®Г¦Г­ГЁГ¶Г» (scissors) Г®ГЇГ°ГҐГ¤ГҐГ«ГїГѕГІ ГЇГ°ГїГ¬Г®ГіГЈГ®Г«ГјГ­ГіГѕ Г®ГЎГ«Г Г±ГІГј, Гў ГЄГ®ГІГ®Г°Г®Г© ГґГ ГЄГІГЁГ·ГҐГ±ГЄГЁ ГЎГіГ¤ГіГІ ГµГ°Г Г­ГЁГІГјГ±Гї ГЇГЁГЄГ±ГҐГ«ГЁ
     vk::Rect2D scissors{};
     scissors.setOffset(vk::Offset2D{0, 0});
     scissors.setExtent(swapchain.getExtent());
 
-    // Состояние области просмотра
+    // Г‘Г®Г±ГІГ®ГїГ­ГЁГҐ Г®ГЎГ«Г Г±ГІГЁ ГЇГ°Г®Г±Г¬Г®ГІГ°Г 
     vk::PipelineViewportStateCreateInfo viewportStateCreateInfo{};
 
-    // Указание области просмотра (viewport)
+    // Г“ГЄГ Г§Г Г­ГЁГҐ Г®ГЎГ«Г Г±ГІГЁ ГЇГ°Г®Г±Г¬Г®ГІГ°Г  (viewport)
     viewportStateCreateInfo.setViewportCount(1);
     viewportStateCreateInfo.setPViewports(&viewport);
 
-    // Указание ножниц (scissor)
+    // Г“ГЄГ Г§Г Г­ГЁГҐ Г­Г®Г¦Г­ГЁГ¶ (scissor)
     viewportStateCreateInfo.setScissorCount(1);
     viewportStateCreateInfo.setPScissors(&scissors);
 
-    // Растеризатор
-    // Используются значения по умолчанию
+    pipelineLayoutInfo.setSetLayouts(descriptorSetLayout);
+    vk::DescriptorPoolSize poolSize{};
+    poolSize.setType(vk::DescriptorType::eCombinedImageSampler);
+    poolSize.setDescriptorCount(1);
+    vk::DescriptorPoolCreateInfo poolInfo{};
+    poolInfo.setMaxSets(1);
+    poolInfo.setPoolSizes(poolSize);
+    descriptorPool = device.createDescriptorPool(poolInfo);
+    vk::DescriptorSetAllocateInfo allocInfo{};
+    allocInfo.setDescriptorPool(descriptorPool);
+    allocInfo.setSetLayouts(descriptorSetLayout);
+    descriptorSet = device.allocateDescriptorSets(allocInfo).front();
+    if (descriptorPool) device.destroyDescriptorPool(descriptorPool);
+    if (descriptorSetLayout) device.destroyDescriptorSetLayout(descriptorSetLayout);
+    // Г€Г±ГЇГ®Г«ГјГ§ГіГѕГІГ±Гї Г§Г­Г Г·ГҐГ­ГЁГї ГЇГ® ГіГ¬Г®Г«Г·Г Г­ГЁГѕ
     vk::PipelineRasterizationStateCreateInfo rasterizationStateCreateInfo{};
     rasterizationStateCreateInfo.setLineWidth(1.0f);
 
-    // Дефолтный мультисемплер
+    // Г„ГҐГґГ®Г«ГІГ­Г»Г© Г¬ГіГ«ГјГІГЁГ±ГҐГ¬ГЇГ«ГҐГ°
     vk::PipelineMultisampleStateCreateInfo multisampleStateCreateInfo{};
     multisampleStateCreateInfo.setMinSampleShading(1.0f);
 
-    // Настройка смешивания цветов
+    // ГЌГ Г±ГІГ°Г®Г©ГЄГ  Г±Г¬ГҐГёГЁГўГ Г­ГЁГї Г¶ГўГҐГІГ®Гў
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
     colorBlendAttachment.setBlendEnable(vk::False);
@@ -102,20 +123,20 @@ void ff::Pipeline::init(const vk::Device &device, const ff::Swapchain &swapchain
     colorBlending.setAttachmentCount(1);
     colorBlending.setPAttachments(&colorBlendAttachment);
 
-    // Создание макета конвейера (Pipeline Layout)
+    // Г‘Г®Г§Г¤Г Г­ГЁГҐ Г¬Г ГЄГҐГІГ  ГЄГ®Г­ГўГҐГ©ГҐГ°Г  (Pipeline Layout)
     vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.setSetLayouts(nullptr);
     pipelineLayoutInfo.setPushConstantRanges(nullptr);
 
-    // Настройка глубины
+    // ГЌГ Г±ГІГ°Г®Г©ГЄГ  ГЈГ«ГіГЎГЁГ­Г»
     vk::PipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.setDepthTestEnable(VK_TRUE);
     depthStencil.setDepthWriteEnable(VK_TRUE);
     depthStencil.setDepthCompareOp(vk::CompareOp::eLess);
     depthStencil.setDepthBoundsTestEnable(VK_FALSE);
     depthStencil.setStencilTestEnable(VK_FALSE);
-    depthStencil.setMinDepthBounds(0.0f);// опционально
-    depthStencil.setMaxDepthBounds(1.0f);// опционально
+    depthStencil.setMinDepthBounds(0.0f);// Г®ГЇГ¶ГЁГ®Г­Г Г«ГјГ­Г®
+    depthStencil.setMaxDepthBounds(1.0f);// Г®ГЇГ¶ГЁГ®Г­Г Г«ГјГ­Г®
 
     try {
         pipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
@@ -123,7 +144,7 @@ void ff::Pipeline::init(const vk::Device &device, const ff::Swapchain &swapchain
         std::cerr << "Failed to create pipeline layout: " << ex.what() << std::endl;
     }
 
-    // Настройка структуры графического конвейера
+    // ГЌГ Г±ГІГ°Г®Г©ГЄГ  Г±ГІГ°ГіГЄГІГіГ°Г» ГЈГ°Г ГґГЁГ·ГҐГ±ГЄГ®ГЈГ® ГЄГ®Г­ГўГҐГ©ГҐГ°Г 
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.setStages(shaderStages);
     pipelineInfo.setPVertexInputState(&vertexInputStateCreateInfo);

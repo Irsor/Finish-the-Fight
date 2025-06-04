@@ -12,6 +12,7 @@
 #include "Window.hpp"
 #include "Swapchain.hpp"
 #include "Pipeline.hpp"
+#include "Texture.hpp"
 
 namespace ff {
     class App {
@@ -23,41 +24,42 @@ namespace ff {
 
     private:
 
-        // Создание инстанса
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЁГ­Г±ГІГ Г­Г±Г 
         void createInstance();
         const std::vector<const char*> getExtensions() const;
 
-        // Создание логического устройства
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ Г«Г®ГЈГЁГ·ГҐГ±ГЄГ®ГЈГ® ГіГ±ГІГ°Г®Г©Г±ГІГўГ 
         void createDevice();
 
-        // Создание очередей
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ Г®Г·ГҐГ°ГҐГ¤ГҐГ©
         void createQueues();
 
-        // Создание поверхности
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЇГ®ГўГҐГ°ГµГ­Г®Г±ГІГЁ
         void createSurface(const Window &window);
 
-        // Создание представлений изображений и удаление
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЇГ°ГҐГ¤Г±ГІГ ГўГ«ГҐГ­ГЁГ© ГЁГ§Г®ГЎГ°Г Г¦ГҐГ­ГЁГ© ГЁ ГіГ¤Г Г«ГҐГ­ГЁГҐ
         void createImageViews();
         void destroyImageViews() const;
         vk::Format findSupportedDepthFormat();
 
-        // Создание прохода рендера
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЇГ°Г®ГµГ®Г¤Г  Г°ГҐГ­Г¤ГҐГ°Г 
         void createRenderPass();
 
-        // Создание фреймбуфферов
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГґГ°ГҐГ©Г¬ГЎГіГґГґГҐГ°Г®Гў
         void createFrameBuffers();
         void destroyFramebuffers() const;
 
-        // Создание пула команд
+        ff::Texture accumulator{};
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЇГіГ«Г  ГЄГ®Г¬Г Г­Г¤
         void createCommandPool();
 
-        // Создание буфера команд
+        // Г‘Г®Г§Г¤Г Г­ГЁГҐ ГЎГіГґГҐГ°Г  ГЄГ®Г¬Г Г­Г¤
         void allocateCommandBuffers();
 
-        // Запись данных в буфер команд
+        // Г‡Г ГЇГЁГ±Гј Г¤Г Г­Г­Г»Гµ Гў ГЎГіГґГҐГ° ГЄГ®Г¬Г Г­Г¤
         void writeDataIntoCommandBuffers(uint32_t imageIndex);
 
-        // Семафоры и fence
+        // Г‘ГҐГ¬Г ГґГ®Г°Г» ГЁ fence
         void createSyncObjects();
 
         vk::Instance instance{};
@@ -73,12 +75,12 @@ namespace ff {
         std::vector<vk::CommandBuffer> commandBuffers{};
 
         // ---
-        // Очереди
+        // ГЋГ·ГҐГ°ГҐГ¤ГЁ
         vk::Queue graphicsQueue{};
         vk::Queue presentQueue{};
         // ---
 
-        // Объекты синхронизации
+        // ГЋГЎГєГҐГЄГІГ» Г±ГЁГ­ГµГ°Г®Г­ГЁГ§Г Г¶ГЁГЁ
         vk::Semaphore imageAvailableSemaphore{};
         vk::Semaphore renderFinishedSemaphore{};
         vk::Fence inFlightFense{};
