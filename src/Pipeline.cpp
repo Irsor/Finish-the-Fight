@@ -33,7 +33,7 @@ void ff::Pipeline::init(const vk::Device &device,
         float uResolution[2];
         float _pad1[2];
         float uTime;
-        int uSampleCount;
+        float uSampleCount;
         float _pad2[2];
     };
 
@@ -167,7 +167,7 @@ void ff::Pipeline::updateUniform(const vk::Device &device, const vk::Extent2D &r
         float uResolution[2];
         float _pad1[2];
         float uTime;
-        int uSampleCount;
+        float uSampleCount;
         float _pad2[2];
     } ubo{};
 
